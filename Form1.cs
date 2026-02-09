@@ -1,9 +1,21 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace IIDXProgressDashboard
 {
+    // DataGridViewã®ã¡ã‚‰ã¤ãé˜²æ­¢ç”¨æ‹¡å¼µãƒ¡ã‚½ãƒƒãƒ‰
+    public static class ExtensionMethods
+    {
+        public static void DoubleBuffered(this DataGridView dgv, bool setting)
+        {
+            Type dgvType = dgv.GetType();
+            System.Reflection.PropertyInfo pi = dgvType.GetProperty("DoubleBuffered",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            pi.SetValue(dgv, setting, null);
+        }
+    }
+
     public partial class Form1 : Form
     {
         internal List<PlayRecord> _currentData = new List<PlayRecord>();
@@ -11,12 +23,85 @@ namespace IIDXProgressDashboard
         public Form1()
         {
             InitializeComponent();
-            // DataGridView‚Ì‰Šúİ’è
-            dgvHistory.AutoGenerateColumns = true;
+            SetupGrid();
 
-            // ƒRƒ“ƒ{ƒ{ƒbƒNƒX‚ÌƒTƒ“ƒvƒ‹’li•K—v‚É‰‚¶‚Ä’Ç‰Á‚µ‚Ä‚­‚¾‚³‚¢j
-            cmbDifficulty.Items.AddRange(new string[] { "SPA", "SPH", "SPL", "DPA", "DPH", "DPL" });
-            cmbDifficulty.SelectedIndex = 0;
+            // åˆæœŸé¸æŠ
+            cmbLevel.SelectedIndex = 0; // "11"
+        }
+
+        private void SetupGrid()
+        {
+            dgvStats.DoubleBuffered(true); // æç”»é«˜é€ŸåŒ–ï¼ˆæ‹¡å¼µãƒ¡ã‚½ãƒƒãƒ‰ãŒå¿…è¦ãªã‚‰å®šç¾©ã€ãªã‘ã‚Œã°ç„¡è¦–ã§ã‚‚å¯ï¼‰
+            dgvStats.AllowUserToAddRows = false;
+            dgvStats.ReadOnly = true;
+            dgvStats.RowHeadersVisible = false;
+            dgvStats.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+
+            // ã‚«ãƒ©ãƒ å®šç¾©
+            dgvStats.Columns.Clear();
+            dgvStats.Columns.Add("Rank", "ãƒ©ãƒ³ã‚¯");
+            dgvStats.Columns.Add("Total", "æ›²æ•°");
+            dgvStats.Columns.Add("FC", "FC");
+            dgvStats.Columns.Add("EXH", "EXH");
+            dgvStats.Columns.Add("Hard", "Hard");
+            dgvStats.Columns.Add("Normal", "Clear");
+            dgvStats.Columns.Add("Easy", "Easy");
+            dgvStats.Columns.Add("Assist", "Assist");
+            dgvStats.Columns.Add("Failed", "Failed");
+            dgvStats.Columns.Add("NoPlay", "NoPlay");
+
+            // åˆ—å¹…èª¿æ•´
+            dgvStats.Columns["Rank"].Width = 80;
+            dgvStats.Columns["Total"].Width = 60;
+            // ä»–ã¯è‡ªå‹•èª¿æ•´ãªã©
+        }
+
+        private void LoadData()
+        {
+            if (cmbLevel.SelectedItem == null) return;
+
+            int level = int.Parse(cmbLevel.SelectedItem.ToString());
+
+            var manager = new LampManager();
+            List<RankStats> stats = new List<RankStats>();
+
+            try
+            {
+                stats = manager.GetRankStats(level);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"ãƒ‡ãƒ¼ã‚¿èª­ã¿è¾¼ã¿ã‚¨ãƒ©ãƒ¼:\n{ex.Message}\nDBãƒ•ã‚¡ã‚¤ãƒ«ãŒæ­£ã—ã„å ´æ‰€ã«ã‚ã‚‹ã‹ç¢ºèªã—ã¦ãã ã•ã„ã€‚");
+                return;
+            }
+
+            // ã‚°ãƒªãƒƒãƒ‰ã«åæ˜ 
+            dgvStats.Rows.Clear();
+            foreach (var s in stats)
+            {
+                int idx = dgvStats.Rows.Add(
+                    s.RankName,
+                    s.TotalCount,
+                    s.FC, s.EXH, s.Hard, s.Normal, s.Easy, s.Assist, s.Failed, s.NoPlay
+                );
+
+                // ãƒ©ãƒ³ãƒ—çŠ¶æ³ã«å¿œã˜ã¦ã‚»ãƒ«ã®èƒŒæ™¯è‰²ã‚’å¤‰ãˆã‚‹ã¨è¦‹ã‚„ã™ã„ã§ã™ï¼ˆãŠå¥½ã¿ã§ï¼‰
+                ApplyColor(dgvStats.Rows[idx], s);
+            }
+        }
+
+        // ãƒ’ãƒ¼ãƒˆãƒãƒƒãƒ—é¢¨ã®è‰²ä»˜ã‘ï¼ˆä¾‹: ãƒãƒ¼ãƒ‰ä»¥ä¸ŠãŒåŠåˆ†è¶…ãˆã¦ã‚Œã°èµ¤ã£ã½ãã™ã‚‹ãªã©ï¼‰
+        // ã“ã“ã§ã¯ã‚·ãƒ³ãƒ—ãƒ«ã«ã€FCãŒã‚ã‚Œã°FCåˆ—ã‚’å…‰ã‚‰ã›ã‚‹ç­‰ã®è£…é£¾ä¾‹
+        private void ApplyColor(DataGridViewRow row, RankStats s)
+        {
+            // ä¾‹: FCåˆ—ã®æ–‡å­—è‰²ã‚’æ°´è‰²ã«
+            if (s.FC > 0) row.Cells["FC"].Style.ForeColor = Color.DarkCyan;
+            if (s.EXH > 0) row.Cells["EXH"].Style.ForeColor = Color.OrangeRed;
+            if (s.Hard > 0) row.Cells["Hard"].Style.ForeColor = Color.Red;
+
+            // è¡Œå…¨ä½“ã®èƒŒæ™¯è‰²ã‚’ãƒ©ãƒ³ã‚¯ã”ã¨ã«å¤‰ãˆã‚‹ãªã©ã‚‚å¯èƒ½
+            if (s.RankName.Contains("åœ°åŠ›")) row.DefaultCellStyle.BackColor = Color.White;
+            else if (s.RankName.Contains("å€‹äººå·®")) row.DefaultCellStyle.BackColor = Color.WhiteSmoke;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -24,48 +109,9 @@ namespace IIDXProgressDashboard
 
         }
 
-        private void btnSearch_Click(object sender, EventArgs e)
+        private void btnLoad_Click(object sender, EventArgs e)
         {
-            try
-            {
-                string song = txtSongName.Text.Trim();
-                string diff = cmbDifficulty.Text.Trim();
-
-                if (string.IsNullOrEmpty(song))
-                {
-                    MessageBox.Show("‹È–¼‚Ìˆê•”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
-                    return;
-                }
-
-                _currentData = DbHelper.GetHistory(song, diff);
-
-                // ƒOƒŠƒbƒh‚É•\¦
-                // ŠÈˆÕ“I‚ÉƒŠƒXƒg‚ğ‚»‚Ì‚Ü‚ÜƒoƒCƒ“ƒh‚µ‚Ü‚·
-                dgvHistory.DataSource = null;
-                dgvHistory.DataSource = _currentData;
-
-                if (_currentData.Count == 0)
-                {
-                    MessageBox.Show("ƒf[ƒ^‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½B");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("ƒGƒ‰[: " + ex.Message);
-            }
-        }
-
-        private void btnShowGraph_Click(object sender, EventArgs e)
-        {
-            if (_currentData == null || _currentData.Count == 0)
-            {
-                MessageBox.Show("ƒOƒ‰ƒt‚ğ•\¦‚·‚éƒf[ƒ^‚ª‚ ‚è‚Ü‚¹‚ñBŒŸõ‚µ‚Ä‚­‚¾‚³‚¢B");
-                return;
-            }
-
-            // ƒOƒ‰ƒtƒtƒH[ƒ€‚ğŠJ‚­
-            var graphForm = new GraphForm(_currentData);
-            graphForm.Show();
+            LoadData();
         }
     }
 }
