@@ -1,6 +1,7 @@
 ﻿import requests
 import cloudscraper
 from bs4 import BeautifulSoup
+from difflib import SequenceMatcher
 import sqlite3
 import unicodedata
 import re
@@ -45,6 +46,19 @@ RANK_MAP = {
     '未定': ('未定', 0),
 }
 
+# === 手動マッピング用リスト ===
+# 何らかの理由で紐付けができないか、間違って紐付くものを強制的に紐付けるために使われる
+# 正規化済曲名 : タグ のリスト
+MANUAL_OVERRIDES = {
+  #  "A": "a_amuro",
+  #  "少年A": "syounen_a",
+  # === 上2つは例 実際はちゃんと区別されるはず ===
+  #  "キャトられ恋はモ～モク": "captivte", # 表記揺れが激しい例
+  #  "gigadelic": "gigadeli",   # スペルが微妙に違う例
+
+  "Scripted Connection⇒  N mix": "script_n", #2026/02/11現在、TextageにLEGGENDARIA譜面がない (追加は32 Pinky Crush) 一方H mixはあり、これに間違って紐付く
+}
+
 # === 曲名正規化ロジック (Textageデータとの紐付け用) ===
 def normalize_text(text):
     """
@@ -67,7 +81,11 @@ def normalize_text(text):
     text = re.sub(r'[\s\-_~～\(\)\[\]\.\,]', '', text)
     return text
 
-# === DB処理 ===
+# === 類似度計算関数 ===
+def similarity(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+# === DB処理 ※古い。get_difficulty_table_master_data で完全代替予定===
 def get_master_data(conn):
     """
     Textageの全曲データをメモリにロードする
@@ -86,6 +104,34 @@ def get_master_data(conn):
             'original_title': title
         }
     return master_map
+
+# === 強化されたマスターデータ取得 ===
+def get_difficulty_table_master_data(conn):
+    """
+    Master DBから「Level 11以上の譜面が存在する曲」だけを取得する。
+    これにより、「同名のLevel 10以下しか存在しない曲」などに誤って紐付くのを防ぎ、
+    かつ比較回数を減らして高速化する。
+
+    ※完全同一の曲名で11以上の難易度を持つもの同士には対応できないので、そういうのは手動対応が必要
+    """
+    cursor = conn.cursor()
+    # chartsテーブルと結合してLevel 11以上の曲のみ抽出 (SP/DP, 削除済かどうか不問)
+    sql = """
+    SELECT DISTINCT s.tag, s.title 
+    FROM songs s
+    JOIN charts c ON s.tag = c.tag
+    WHERE c.level = 11 OR c.level = 12
+    """
+    cursor.execute(sql)
+    
+    master_list = []
+    for row in cursor.fetchall():
+        master_list.append({
+            'tag': row[0],
+            'title': row[1],
+            'norm_title': normalize_text(row[1]) # 事前に正規化しておく
+        })
+    return master_list
 
 def init_db(conn):
     cursor = conn.cursor()
@@ -166,6 +212,7 @@ def scrape_wiki(url):
 
         elif element.name == 'table':
             if not current_rank: continue
+            # TODO: ページからはBPM, Notes数が拾えるのでそれを拾って入れる より厳密な紐付けが可能になる
 
             # テーブル内のリンク(aタグ) または テキストを取得
             # 通常、曲名は td の中にあり、リンクになっていることが多い
@@ -200,11 +247,16 @@ def main():
     master_map = get_master_data(conn)
     print(f"Master Songs: {len(master_map)}")
 
-    # 2. Wikiスクレイピング
+    # 2. Level 11以上の曲リストだけを取得
+    print("Loading Level 11 or upper Master Data...")
+    master_candidates = get_difficulty_table_master_data(conn)
+    print(f"Target Candidates: {len(master_candidates)} songs")
+
+    # 3. Wikiスクレイピング
     wiki_data = scrape_wiki(TARGET_URL)
     print(f"Scraped Songs: {len(wiki_data)}")
 
-    # 3. マッチングとDB登録
+    # 4. マッチングとDB登録
     cursor = conn.cursor()
     success_count = 0
     fail_count = 0
@@ -214,28 +266,74 @@ def main():
 
     print("-" * 40)
     # スクレイピング後は (ページ上の難易度ランク表記, 対応するRANK_MAP内のランク表記, RANK_MAP内の表示順, ページ上の曲名) が取れる
-    for raw_rank, rank_str, rank_id, song_name in wiki_data:
-        norm_name = normalize_text(song_name)
+    for raw_rank, norm_rank, sort_order, song_name in wiki_data:
+        norm_wiki_name = normalize_text(song_name)
         
-        # マッチング試行
-        match = master_map.get(norm_name)
+        exact_match = None
+        best_match = None
+        highest_score = 0.0
         
-        if match:
-            # 成功: DBに登録
-            tag = match['tag']
-            original_title = match['original_title']
-            
-            # 重複チェック（Wiki内で同じ曲が複数箇所にある場合など）
+        # 手動対応リストに定義があるか見る 正規化した名前で辞書を引く
+        manual_tag = MANUAL_OVERRIDES.get(norm_wiki_name)
+
+        if manual_tag:
+            # 手動対応リストによる紐付け
             try:
-                cursor.execute(f"INSERT INTO {TABLE_NAME} (tag, song_name, difficulty_rank_id, level) VALUES (?, ?, ?, ?)",
-                               (tag, original_title, rank_id, 11))
+                # MasterDBからそのタグの情報を引いて確定
+                cursor.execute("SELECT title FROM songs WHERE tag = ?", (manual_tag,))
+                row = cursor.fetchone()
+                original_title = row[0]
+                print(f"[Manual Override] {song_name} -> {original_title}")
+                # 扱いは完全一致と同じ
+                exact_match = {"tag": manual_tag, "title": original_title}
+            except:
+                #手動対応リストに入れているタグが正しくない
+                print(f"[Manual Override FAILED] maybe tag is incorrect: {song_name} -> {original_title}")
+        else:
+            # B. 完全一致または類似度による紐付け 完全一致を探す
+            exact_match = next((m for m in master_candidates if m['norm_title'] == norm_wiki_name), None)
+
+        # B. 完全一致チェック (高速化のため)
+        # 候補リストの中から完全一致を探す
+        # exact_match = next((m for m in master_candidates if m['norm_title'] == norm_wiki_name), None)
+        
+        # 手動か完全一致がある場合
+        if exact_match:
+            best_match = exact_match
+            highest_score = 1.0
+        else:
+            # C. 類似度チェック (完全一致しなかった場合のみ)
+            # 閾値: 0.75 (75%) 以上で最も似ているものを採用
+            for candidate in master_candidates:
+                score = similarity(norm_wiki_name, candidate['norm_title'])
+                if score > highest_score:
+                    highest_score = score
+                    best_match = candidate
+            
+            # 閾値判定 実際には類似度88%以下を除外しないと余計に拾ってきた要素を無視できない
+            if highest_score < 0.89:
+                best_match = None
+
+        # 登録処理
+        if best_match:
+            tag = best_match['tag']
+            original_title = best_match['title']
+            
+            # 類似度マッチの場合はログに出して確認できるようにする
+            if highest_score < 1.0:
+                print(f"[Fuzzy Match] Wiki: '{song_name}' <=> Master: '{original_title}' (Score: {highest_score:.2f})")
+
+            try:
+                cursor.execute(
+                    f"INSERT INTO {TABLE_NAME} (tag, song_name, difficulty_rank_id, level) VALUES (?, ?, ?, ?)",
+                    (tag, original_title, sort_order, 11)
+                )
                 success_count += 1
             except sqlite3.IntegrityError:
                 pass # 既に登録済みなら無視
         else:
-            # 失敗
             fail_count += 1
-            failed_list.append((raw_rank, rank_str, rank_id, song_name))
+            failed_list.append((raw_rank, norm_rank, sort_order, song_name)) # 必要ならここで類似度1位もログに出す
 
     conn.commit()
     conn.close()
@@ -249,8 +347,8 @@ def main():
         # print("\n=== 紐付けに失敗した曲（一部抜粋） ===")
         print("\n=== 紐付けに失敗した曲 ===")
         # for rank, name in failed_list[:10]:
-        for raw_rank, rank_str, rank_id, name in failed_list:
-            print(f"[{raw_rank}] {name}")
+        for raw_rank, norm_rank, sort_order, song_name in failed_list[:10]:
+            print(f"[{raw_rank}] {song_name}")
         print("... (これらは正規化ロジックを見直すか、手動マッピング辞書を作成して解決します)")
 
 if __name__ == "__main__":
