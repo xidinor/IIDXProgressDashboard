@@ -113,7 +113,23 @@ def main():
     # テーブル作成
     # ユーザー提供のリスト構造に合わせてカラムを定義
     # ['11', '曲名', 'SPA', 1450, 'F', 'B', 'NO PLAY', 'E-CLEAR', 0, 1827, None, 76, '-15.00', 'OFF', '2025...']
-    #   0      1       2      3     4    5       6          7      8    9     10   11      12       13       14
+    #   0      1       2     3     4    5       6          7      8   9     10   11     12      13      14
+    # inf_daken_counter_obsw で吐き出されるPickleの中身
+    #  0: ??? (play level?)
+    #  1: 曲名
+    #  2: 難易度
+    #  3: total notes
+    #  4: 前回 DJ RANK
+    #  5: 今回 DJ RANK
+    #  6: 前回 クリア種別
+    #  7: 今回 クリア種別
+    #  8: 前回 EX SCORE
+    #  9: 今回 EX SCORE
+    # 10: 前回 MISS COUNT
+    # 11: 今回 MISS COUNT
+    # 12: ???
+    # 13: プレイオプション
+    # 14: プレイ日付
     create_table_query = f"""
     CREATE TABLE {table_name} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
