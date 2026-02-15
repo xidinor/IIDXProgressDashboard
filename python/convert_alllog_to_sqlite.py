@@ -1,11 +1,86 @@
 ﻿import pickle
 import sqlite3
 import os
+import unicodedata
+import re
+from difflib import SequenceMatcher
 
 # === 設定 ===
 pkl_file = 'alllog.pkl'
 db_file = 'iidx-progress.db'
 table_name = 'play_history'
+
+# === 正規化・類似度ロジック（Wiki紐付け時のものを流用） ===
+def normalize_text(text):
+    if not text: return ""
+    text = unicodedata.normalize('NFKC', text)
+    text = text.lower()
+    # INFINITAS特有の表記（もしあれば）や記号を削除
+    text = re.sub(r'[\s\-_~～\(\)\[\]\.\,]', '', text)
+    return text
+
+def similarity(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+# === マスタデータ（曲名→タグ）の読み込み ===
+def load_song_master(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT tag, title FROM songs")
+    
+    # 完全一致検索用: タイトル -> タグ の辞書
+    title_map = {}
+    # 高速検索用：正規化タイトル -> タグ の辞書
+    norm_map = {}
+    # 類似度判定用：全候補リスト
+    candidates = []
+    
+    for row in cursor.fetchall():
+        tag = row[0]
+        title = row[1]
+        norm = normalize_text(title)
+        
+        title_map[title] = tag
+        norm_map[norm] = tag
+        candidates.append({'tag': tag, 'title': title, 'norm': norm})
+        
+    return title_map, norm_map, candidates
+
+def find_tag(song_name, title_map, norm_map, candidates):
+    """
+    INFINITASの曲名を受け取り、Textageのタグを返す
+    1. 完全一致
+    2. 正規化一致
+    3. 類似度判定
+    """
+    if not song_name: return None
+    
+    norm_name = normalize_text(song_name)
+    
+    # 1. 完全一致
+    if song_name in title_map:
+        return title_map[song_name]
+
+    # 2. 正規化一致
+    if norm_name in norm_map:
+        return norm_map[norm_name]
+    
+    # 3. 類似度判定（低速だが強力）
+    best_match = None
+    highest_score = 0.0
+    
+    for cand in candidates:
+        score = similarity(norm_name, cand['norm'])
+        if score > highest_score:
+            highest_score = score
+            best_match = cand['tag']
+            
+    # 閾値 0.8 (80%) 以上で一致判定
+    if highest_score >= 0.8:
+        print(f"Fuzzy Match: {song_name} -> {best_match} ({highest_score:.2f})")
+        return best_match
+        
+    return None
+
 
 # === メイン処理 ===
 def main():
