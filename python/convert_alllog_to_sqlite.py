@@ -99,6 +99,14 @@ def main():
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
 
+    # 3. マスタ読み込み
+    print("楽曲マスタをロード中...")
+    try:
+        title_map, norm_map, candidates = load_song_master(conn)
+    except sqlite3.OperationalError:
+        print("エラー: songs テーブルが見つかりません。先にマスタデータを作成してください。")
+        return
+
     # 初期化のため、既存の同名テーブルがあれば削除（作り直し）
     cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
 
