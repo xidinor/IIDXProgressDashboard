@@ -134,6 +134,7 @@ def main():
     CREATE TABLE {table_name} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         level TEXT,
+        song_tag TEXT,
         song_name TEXT,
         difficulty_type TEXT,
         total_notes INTEGER,
@@ -150,13 +151,14 @@ def main():
     # 3. データの挿入
     print("データベースへ登録中...")
     insert_count = 0
+    linked_count = 0
     
     # 登録用SQL
     insert_sql = f"""
     INSERT INTO {table_name} (
-        level, song_name, difficulty_type, total_notes, 
+        level, song_tag, song_name, difficulty_type, total_notes, 
         clear_type, score, miss_count, played_option, played_at, original_data
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     for row in data:
@@ -180,10 +182,14 @@ def main():
 
                 # 生データ（デバッグ用に念のため文字列として全部入れておく）
                 original_str = str(row)
+                # 名寄せ処理
+                tag = find_tag(song_name, title_map, norm_map, candidates)
+                if tag:
+                    linked_count += 1
 
                 # 実行
                 cursor.execute(insert_sql, (
-                    level, song_name, difficulty_type, total_notes,
+                    level, tag, song_name, difficulty_type, total_notes,
                     clear_type, score, miss_count, played_option, played_at, original_str
                 ))
                 insert_count += 1
@@ -198,7 +204,7 @@ def main():
     print("-" * 40)
     print(f"完了しました。")
     print(f"保存先DB: {db_file}")
-    print(f"登録件数: {insert_count} / {len(data)}")
+    print(f"登録件数: {insert_count} / {len(data)}, 楽曲マスタ紐付け率 {(linked_count/insert_count)*100:.1f}%")
     print("作成されたDBは 'DB Browser for SQLite' 等のツールで確認できます。")
 
 if __name__ == "__main__":
