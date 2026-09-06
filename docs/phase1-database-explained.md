@@ -177,4 +177,35 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 次のPhase 2では、この土台に曲・譜面マスターを入れ、外部の曲名から正しい譜面を特定する仕組みを作ります。既存UIの新DBへの接続はPhase 6です。
 
+## 9. ユーザーはどこからMigrationを実行するのか
+
+**Phase 1時点では、ユーザーが画面からMigrationを実行する入口はありません。** DB基盤を実装した段階で、現在呼び出しているのは自動テストだけです。
+
+今後の接続案は、アプリの起動処理で、**使用するDBの保存先が決まった後、画面がデータを読み始める前に自動実行する**形です。以下は実装済みの起動フローではなく、後続フェーズで組み込む想定です。
+
+```mermaid
+flowchart TD
+    A["アプリ起動"] --> B["使用するDBの保存先を決定"]
+    B --> C["DatabaseInitializer.Initialize()"]
+    C --> D["MigrationRunner.Run()"]
+    D --> E{"DBの状態"}
+    E -->|"新規・空"| F["v1のテーブルを作成"]
+    E -->|"既存v1"| G["構造と適用履歴を確認"]
+    E -->|"未対応の形式"| H["エラーを案内"]
+    F --> I["画面でデータを読み込む"]
+    G -->|"確認成功"| I
+    G -->|"不一致"| H
+```
+
+呼び出し自体は、次のコードです。`databasePath` は事前に決定した出力先のパスです。
+
+```csharp
+var database = new DatabaseInitializer(databasePath);
+database.Initialize();
+```
+
+接続先の候補は [Program.cs](../Program.cs) の起動処理ですが、保存先・エラー表示・UIを固めない実行方法はまだ実装していません。既存UIを新DBへ接続するPhase 6で組み込む想定です。起動時に自動実行すれば、ユーザーが毎回「Migration実行」ボタンを押す必要はありません。
+
+今回のMigrationは**DBのテーブル構造を用意する処理**です。旧DBからプレイ履歴を移す処理は別のImporterが担当します。また、現在対応しているのは新規作成と既存v1の確認までで、将来のv1→v2更新は未実装です。
+
 関連資料： [仕様書](../SPECS.md)、[DB基盤の利用方法](../Database/README.md)、[作業ルール](../AGENTS.md)。
