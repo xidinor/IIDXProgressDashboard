@@ -364,6 +364,9 @@ FodyWeavers.xsd
 
 # SQLite DB and python pickle
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.pkl
 
 # CSV and TSV data files

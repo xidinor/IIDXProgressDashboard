@@ -155,7 +155,12 @@ Pythonの本番実行依存を追加しない。最終配布は .NET 8 self-cont
 dotnet build IIDXProgressDashboard.sln
 ```
 
-草案作成時点ではテストプロジェクトはない。DB・照合・Importerを実装する段階で、対応する自動テストを追加し、そのプロジェクトへの `dotnet test` コマンドをここへ記載する。
+Phase 1のDB基盤テストは以下で実行する。後続の照合・Importerについても、実装時に対応する自動テストを追加する。
+
+```powershell
+dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
+```
+
 文書のみの変更ではビルド不要。実行していない検証を成功と報告しない。
 
 該当機能を変更する際の重点検証:

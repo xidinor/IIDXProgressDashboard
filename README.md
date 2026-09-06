@@ -2,7 +2,7 @@
 
 IIDX / INFINITAS のプレイ履歴をもとに、クリア状況やスコア・BP（ミスカウント）の推移、非公式難易度表ごとの進捗を可視化する Windows 向けデスクトップアプリケーションです。
 
-現在は既存実装の改善・DB統合に向けた準備段階です。別添ドキュメントに沿って段階的に改修します。新DB基盤（Phase 1）以降の機能は、まだ実装されていません。
+別添ドキュメントに沿って段階的に改修しています。新DB基盤（Phase 1）の初期DDL・初期化・Migration管理を実装しました。利用方法と保全方針は [Database/README.md](Database/README.md) を参照してください。マスター取得・履歴取込・既存UIの新DB接続は後続フェーズです。
 
 ## 現在できることと制限
 
@@ -98,7 +98,7 @@ DB接続パスは現在、作業ディレクトリに対する相対パスです
 
 作業方針、実データの調査結果、検証項目、未確定事項は [AGENTS.md](AGENTS.md) を参照してください。データに関する記載は調査時点の情報であり、ファイル追加・更新時に再確認します。
 
-コード変更時は `dotnet build IIDXProgressDashboard.sln` を実行し、変更した機能に応じた検証を行います。現時点ではテストプロジェクトはなく、DB・照合・Importerの実装に合わせて追加する予定です。
+コード変更時は `dotnet build IIDXProgressDashboard.sln` を実行し、変更した機能に応じた検証を行います。DB基盤の自動テストは `dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj` で実行します。個人データは使用しません。
 
 ## ライセンス
 
