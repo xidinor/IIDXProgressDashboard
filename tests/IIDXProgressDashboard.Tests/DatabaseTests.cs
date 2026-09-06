@@ -4,14 +4,17 @@ using Xunit;
 
 namespace IIDXProgressDashboard.Tests;
 
+/// <summary>個人データを使わず、合成DBで初期化・制約・失敗時の保全を確認する。</summary>
 public sealed class DatabaseTests : IDisposable
 {
+    // テストケースごとに独立した出力先を作り、並列実行でもDBを共有しない。
     private readonly string directory = Path.Combine(Path.GetTempPath(), "IIDXProgressDashboard.Tests", Guid.NewGuid().ToString("N"));
     private DatabaseInitializer Database => new(Path.Combine(directory, "iidx-progress.db"));
 
     [Fact]
     public void InitializationIsRepeatableAndPreservesHistory()
     {
+        // 初期化済みDBに履歴を入れて再初期化し、構造・適用履歴・保存データが維持されるか確認する。
         Database.Initialize();
         using (var connection = Database.OpenConnection()) Seed(connection);
         Database.Initialize();
@@ -26,6 +29,7 @@ public sealed class DatabaseTests : IDisposable
         Assert.Null(Scalar(reopened, "PRAGMA foreign_key_check;"));
     }
 
+    // 不正な参照・重複・範囲外の値・参照先削除を、同じ手順で個別に検証する。
     [Theory]
     [InlineData("INSERT INTO charts(tag,play_style,difficulty) VALUES ('missing','SP','A');")]
     [InlineData("INSERT INTO charts(tag,play_style,difficulty) VALUES ('test','SP','A');")]
@@ -41,6 +45,7 @@ public sealed class DatabaseTests : IDisposable
         Database.Initialize();
         using var connection = Database.OpenConnection();
         Seed(connection);
+        // SQLiteの制約違反コード19で拒否され、既存の2プレイは残ることを確認する。
         Assert.Equal(19, Assert.Throws<SqliteException>(() => Execute(connection, sql)).SqliteErrorCode);
         Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM play_history;"));
     }
@@ -48,6 +53,7 @@ public sealed class DatabaseTests : IDisposable
     [Fact]
     public void ChartIdentityAndGaugeTablesRemainIndependent()
     {
+        // 同じ曲の別譜面と、同じ譜面のNORMAL/HARD別評価を登録する。
         Database.Initialize();
         using var connection = Database.OpenConnection();
         Seed(connection);
@@ -61,6 +67,7 @@ public sealed class DatabaseTests : IDisposable
             """);
         Assert.Equal(4L, Scalar(connection, "SELECT COUNT(*) FROM charts;"));
         Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM difficulty_table_entries WHERE chart_id=1;"));
+        // 他の難易度表にしか存在しないランクを参照できないことも確認する。
         Assert.Throws<SqliteException>(() => Execute(connection,
             "UPDATE difficulty_table_entries SET rank_code='B' WHERE table_id=2;"));
     }
@@ -70,12 +77,14 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY); INSERT INTO schema_migrations VALUES(99);")]
     public void UnknownDatabaseIsNotModified(string sql)
     {
+        // 初期化処理を使わずに旧形式・未知形式のDBを用意する。
         Directory.CreateDirectory(directory);
         using (var connection = new SqliteConnection($"Data Source={Database.DatabasePath};Pooling=False"))
         {
             connection.Open();
             Execute(connection, sql);
         }
+        // 拒否されたことに加え、ファイル全体がバイト単位で変わっていないことを確認する。
         var before = File.ReadAllBytes(Database.DatabasePath);
         Assert.Throws<InvalidOperationException>(() => Database.Initialize());
         Assert.Equal(before, File.ReadAllBytes(Database.DatabasePath));
@@ -87,6 +96,7 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("DROP INDEX idx_play_history_bp;")]
     public void ModifiedSchemaOrMigrationHistoryIsRejected(string sql)
     {
+        // 正常なv1を作ってから履歴やインデックスを変更し、再初期化で黙って修復しないことを確認する。
         Database.Initialize();
         using (var connection = Database.OpenConnection()) Execute(connection, sql);
         var before = File.ReadAllBytes(Database.DatabasePath);
@@ -100,11 +110,12 @@ public sealed class DatabaseTests : IDisposable
         Directory.CreateDirectory(directory);
         using var connection = new SqliteConnection($"Data Source={Database.DatabasePath};Pooling=False");
         connection.Open();
-        // A TEMP view is not part of main.sqlite_schema but conflicts with CREATE TABLE.
-        // Failure occurs after several earlier tables have already been created.
+        // mainのスキーマ検査には現れないTEMPビューで、途中のCREATE TABLEを意図的に失敗させる。
+        // それ以前に作成したテーブルも、トランザクション全体の取り消しで消えることを確認する。
         Execute(connection, "CREATE TEMP VIEW songs AS SELECT 'conflict' AS tag;");
         Assert.Throws<SqliteException>(() => new MigrationRunner().Run(connection));
         Assert.Equal(0L, Scalar(connection, "SELECT COUNT(*) FROM main.sqlite_schema;"));
+        // 失敗原因を除去すると、同じ接続で初期化をやり直せることを確認する。
         Execute(connection, "DROP VIEW temp.songs;");
         new MigrationRunner().Run(connection);
         Assert.Equal(1L, Scalar(connection, "SELECT COUNT(*) FROM schema_migrations;"));
@@ -113,11 +124,13 @@ public sealed class DatabaseTests : IDisposable
     [Fact]
     public void OpenConnectionDoesNotCreateMissingDatabase()
     {
+        // 通常の接続APIは、ディレクトリが存在していても欠けたDBファイルを新規作成しない。
         Directory.CreateDirectory(directory);
         Assert.Throws<SqliteException>(() => Database.OpenConnection());
         Assert.False(File.Exists(Database.DatabasePath));
     }
 
+    // 共通fixture：同じ譜面の2プレイ。スコア低下、ランプ0、BPのNULLと0を含める。
     private static void Seed(SqliteConnection connection) => Execute(connection, """
         INSERT INTO songs(tag,title,normalized_title) VALUES ('test','Test','test');
         INSERT INTO charts(chart_id,tag,play_style,difficulty,level,total_notes) VALUES(1,'test','SP','A',11,1000);
@@ -129,6 +142,7 @@ public sealed class DatabaseTests : IDisposable
 
     private static object? Scalar(SqliteConnection connection, string sql)
     {
+        // 件数やPRAGMAの結果など、検証に使う単一の値を取得する。
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         return command.ExecuteScalar();
@@ -136,6 +150,7 @@ public sealed class DatabaseTests : IDisposable
 
     private static void Execute(SqliteConnection connection, string sql)
     {
+        // 合成データの準備や、制約違反を起こすためのSQLを実行する。
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.ExecuteNonQuery();
@@ -143,6 +158,7 @@ public sealed class DatabaseTests : IDisposable
 
     public void Dispose()
     {
+        // 各テストが所有する一時ディレクトリだけを、接続の解放後に片付ける。
         if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
     }
 }
