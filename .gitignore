@@ -372,3 +372,6 @@ FodyWeavers.xsd
 # CSV and TSV data files
 *.csv
 *.tsv
+
+# Local Textage master JavaScript snapshots
+/data/**/*.js
