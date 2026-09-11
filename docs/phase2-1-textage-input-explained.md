@@ -55,3 +55,25 @@ JSの評価・実行、ネットワーク取得、DB接続は行わない。全�
 ビルドは成功（既存パッケージ互換性・Nullable等の警告あり）。自動テストは既存18件と追加5件の計23件が成功した。DBスキーマ・既存DB・既存UIへの変更はない。
 
 後続工程は安全な構文解析、曲・譜面モデルへの変換、対象範囲と完全性判定、TitleNormalizer、chart_idを維持する更新、ChartResolver。今回の読込結果をそのままDBへ登録することはできない。
+
+## 2026-09-11：Issue #4 項目6.1に合わせたテスト更新
+
+Readerの公開入力・戻り値・例外・ファイルへの副作用を検証するブラックボックステストに整理した。基本fixtureは独立して定義した7ファイルの合成Textage形式とし、実装のRequiredFileNamesから生成しない。Parserは未実装なので、このfixtureのParser成功までは検証していない。
+
+| Issueの入力条件・保証 | 対応テスト |
+| --- | --- |
+| 正しいファイル名とUTF-8、BOM有無、元バイト長・SHA-256・原本保持 | ReadsUtf8AndPreservesOriginalBytes |
+| 空ファイル・空白・BOMのみ | RejectsEmptyOrWhitespaceInput |
+| 不正UTF-8、切断、バイナリ、CP932・UTF-16へのfallback禁止 | RejectsInvalidUtf8WithoutFallbackOrReplacement |
+| でたらめなUTF-8、実行可能に見える文字列を実行せず返す | ReturnsUtf8TextWithoutParsingOrExecuting |
+| 誤ったファイル名（内容が正しい／不正） | RejectsWrongFileNameRegardlessOfContent |
+| 複数の必須ファイル不足 | ReportsAllMissingFiles |
+| 必須ファイル間での内容入替えはReaderでは成功 | ReturnsSwappedContentsWithoutSemanticValidation |
+| 正常入力と余分な不正バイナリファイル | IgnoresUnrelatedFileEvenWhenItsEncodingIsInvalid |
+| 事前キャンセルを無視しない | SupportsCancellation |
+
+不正バイトは再現可能な固定列を使う。最後の必須ファイルが不正でも部分snapshotを返さず、原本を補正しないことを確認する。正常入力では改行・全角空白・結合文字も保持する。
+
+2026-09-11実行結果：ソリューションのビルド成功（既存警告27件、エラー0）、テスト37件成功（既存DB18件、Reader19件）、スキップ0。Reader本体・DB・実データへの変更はない。
+
+Issueの項目6.2〜6.6（Parser内部状態、Provider更新の保全、正規化・alias・Resolver、統合）と6.7のImporter予約は、各実装時に追加する。今回はそれらを空のテストや成功する代用品で置き換えていない。読込途中のキャンセルを決定的に発生させるテストは未追加であり、今回のキャンセル検証は事前キャンセルに限定する。
