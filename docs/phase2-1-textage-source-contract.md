@@ -123,3 +123,9 @@ DB反映の原子性・バックアップ・import_runs記録は項目3の担当
 追加ファイルは現在不要。配信元との文字列一致まで確認できたため、当初の取得時刻不明は今回の調査を妨げない。将来INFINITAS収録状態やCS専用・旧BEGINNERまで扱う場合は、その版・取得条件・譜面同一性の追加調査が必要になる。
 
 今回の検証は外部HTTP応答と実ファイルの読取比較、限定的な数値行集計、文書差分確認。個人DBは開いていない。コード変更なしのためビルド・テストは再実行していない。先行読込基盤の23件成功は[前回記録](phase2-1-textage-input-explained.md)を参照。
+
+## 2026-09-12の確定例外：firstemo
+
+ユーザー確認により、firstemoはCS版IIDX 13 DistorteDのTUTORIAL専用曲first emotionで通常プレイ不能と判明した。
+tag完全一致で通常マスター・CS比較の意味処理から除外し、NON_PLAYABLE_EXCLUDED診断を残す。
+ファイル全体の構文検証と他曲の矛盾検出は維持する。詳細は[統合解説の追記](phase2-master-matching-explained.md)を参照。

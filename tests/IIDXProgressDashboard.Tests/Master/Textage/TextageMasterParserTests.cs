@@ -23,6 +23,41 @@ public sealed class TextageMasterParserTests
     internal static MasterSnapshot Parse(Dictionary<string, string> data) => new TextageMasterParser().Parse(Sources(data));
 
     [Fact]
+    public void ExcludesOnlyKnownTutorialTagAcrossCatalogAndCsComparison()
+    {
+        var data = Fixture();
+        // 通常曲を残し、通常プレイ不能のtagだけを各入力へ追加する。
+        data["titletbl.js"] = Fixture()["titletbl.js"].Replace("'__dmy__':", "'firstemo':[13,1,0,'G','A','first emotion'], '__dmy__':");
+        data["actbl.js"] = data["actbl.js"].Replace("'song':", "'firstemo':[1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], 'song':");
+        data["datatbl.js"] = data["datatbl.js"].Replace("'song':", "'firstemo':[0,0,0,0,0,0,0,0,0,0,0,'0'], 'song':");
+        data["cstbl.js"] = "cstbl[13]={'firstemo':[]};";
+        data["cstbl1.js"] = "cstbl[3]={};";
+        data["cstbl2.js"] = "cstbl[9]={};";
+        var result = Parse(data);
+        Assert.Equal("song", Assert.Single(result.Songs).Tag);
+        Assert.Equal(10, result.Charts.Count);
+        Assert.All(result.Charts, chart => Assert.Equal("song", chart.Tag));
+        Assert.Equal(4, result.Diagnostics.Count(d => d.Code == "NON_PLAYABLE_EXCLUDED" && d.Tag == "firstemo"));
+        // 類似tagは例外を引き継がず、通常の検証で全体拒否する。
+        var other = data.ToDictionary(p => p.Key, p => p.Value.Replace("firstemo", "firstemo_other"));
+        Assert.Throws<InvalidDataException>(() => Parse(other));
+    }
+
+    [Fact]
+    public void TutorialExclusionDoesNotHideSyntaxErrorsOrPermitEmptyCatalog()
+    {
+        var broken = Fixture();
+        broken["titletbl.js"] = "titletbl={'firstemo':[";
+        Assert.Throws<InvalidDataException>(() => Parse(broken));
+        var empty = Fixture().ToDictionary(p => p.Key, p => p.Value.Replace("'song'", "'firstemo'"));
+        Assert.Throws<InvalidDataException>(() => Parse(empty));
+        // 通常曲のflagsだけ存在するslotは従来どおり拒否する。
+        var invalid = Fixture();
+        invalid["actbl.js"] = "actbl={'song':[1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]};";
+        invalid["datatbl.js"] = "datatbl={'song':[0,0,0,0,0,0,0,0,0,0,0,'0']};";
+        Assert.Throws<InvalidDataException>(() => Parse(invalid));
+    }
+    [Fact]
     public void BuildsSongsAndAllTenChartKindsWithoutMergingOldBeginner()
     {
         var result = Parse(Fixture());
