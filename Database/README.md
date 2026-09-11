@@ -27,6 +27,10 @@ using var connection = database.OpenConnection();
 - Phase 1では非空DBのアップグレードは行わない。将来v2以降を追加する際は、適用前のSQLiteバックアップと、接続を閉じてバックアップから復旧する手順を先に実装・検証する。
 - `data/` は入力原本用。出力先に指定しない。Importer実装時には入力・出力の絶対パスの相違も検証する。
 
+Phase 2-3では `DatabaseBackup.Create` を追加し、マスター更新前にSQLiteバックアップと整合性検査を行う。
+保存先・保持方針・別パスへの復旧手順は[Phase 2-3解説](../docs/phase2-3-safe-master-update-explained.md)を参照。
+既存v1のスキーマとMigrationRunnerの動作は変更しておらず、将来の非空DBのMigrationへの自動接続は引き続き後続作業となる。
+
 ## 検証
 
 ```powershell
