@@ -63,6 +63,15 @@ public sealed class SongAliasRepository
         if (key.Length == 0) return new([]);
         using var connection = OpenValidated();
         using var transaction = connection.BeginTransaction(deferred: true);
+        return FindCandidates(connection, transaction, externalTitle, sourceName);
+    }
+
+    // Resolverも同じ読取snapshot内でタイトル候補と譜面を検証する。
+    internal static SongTitleMatch FindCandidates(SqliteConnection connection, SqliteTransaction transaction,
+        string externalTitle, string? sourceName)
+    {
+        if (sourceName is not null) ValidateSource(sourceName);
+        var key = TitleNormalizer.Normalize(externalTitle);
         var evidence = new List<SongTitleEvidence>();
         // Phase 2-3の任意規則で保存されたキーもあるため、原表記から共通規則で読む。
         // DBを暗黙に再索引化せず、非アクティブ曲も過去履歴の候補として保持する。
