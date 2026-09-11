@@ -41,10 +41,8 @@ var database = new DatabaseInitializer(outputPath);
 database.Initialize();
 var provider = new MasterDataProvider();
 
-// Phase 2-3単独の例。IDENTITYは原表記をそのまま格納する明示的な暫定規則。
-// Phase 2-4で共通TitleNormalizerとその規則版へ差し替える。
-var service = new MasterUpdateService(database, backupDirectory,
-    title => title, "IDENTITY_PHASE2_3");
+// Phase 2-4で共通TitleNormalizerへ接続済み。
+var service = new MasterUpdateService(database, backupDirectory);
 var plan = await service.PrepareAsync(
     ct => provider.ReadLocalAsync(inputDirectory, cancellationToken: ct), cancellationToken);
 
@@ -54,7 +52,7 @@ var result = await service.ApplyAsync(plan, cancellationToken: cancellationToken
 
 非アクティブ化する場合は、反映前に `plan.MissingSongs` と `plan.MissingCharts` を提示し、その一式が意図したカタログ変更であると確認してから、**そのplan** を `ApplyAsync(plan, confirmMissing: true, ...)` に渡す。確認画面の接続はPhase 6。引数のtrueは確認結果を渡すためのAPIであり、Providerの成功だけからtrueにしない。Providerの `CanDeactivateMissing=false` は維持する。
 
-`normalized_title` は指定関数で全件計算し、空結果なら反映しない。正規化関数と規則版の指定は必須で、暗黙のUnicode変換やalias生成は行わない。Phase 2-4では正式規則で再適用し、aliasも共通規則へ接続する必要がある。
+Phase 2-3時点では正規化関数と規則版を必須指定していた。Phase 2-4で共通TitleNormalizerへ接続し、暫定の関数指定APIを終了した。空結果なら反映しない動作と、aliasを自動生成しない方針は維持する。詳細は[Phase 2-4](phase2-4-title-normalizer-alias-explained.md)を参照。
 
 DB処理はTask.RunでUIスレッドから分離する。`IProgress<int>` は処理したUPSERT候補数を通知する。通知時点では未commitなので成功件数と解釈しない。UIでは `Progress<int>` をUIスレッドで作成して渡す。
 
