@@ -1,5 +1,6 @@
 using IIDXProgressDashboard.Database;
 using IIDXProgressDashboard.Master;
+using IIDXProgressDashboard.Matching;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -10,9 +11,27 @@ public sealed class MasterUpdateServiceTests : IDisposable
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), "IIDXProgressDashboard.Tests", Guid.NewGuid().ToString("N"));
     private DatabaseInitializer Database => new(Path.Combine(directory, "output.db"));
-    private MasterUpdateService Service => new(Database, Path.Combine(directory, "backups"), s => s.ToUpperInvariant(), "test-uppercase-v1");
+    private MasterUpdateService Service => new(Database, Path.Combine(directory, "backups"));
 
     public MasterUpdateServiceTests() => Database.Initialize();
+
+    [Fact]
+    public async Task SharedNormalizationAndManualAliasSurviveRenameWithoutAutomaticOldAlias()
+    {
+        // Provider由来の原表記を保存し、外部入力とaliasが共通の規則で候補に到達する。
+        await Service.ApplyAsync(await Prepare(Snapshot(["A"], "Ａ Song")));
+        var aliases = new SongAliasRepository(Database, Path.Combine(directory, "backups"));
+        aliases.Register("A", "Ｍanual Name");
+        Assert.Equal("A", Assert.Single(aliases.FindCandidates(" a　song ").Tags));
+        Assert.Equal("Ａ Song", Scalar("SELECT title FROM songs;"));
+        Assert.Equal("A SONG", Scalar("SELECT normalized_title FROM songs;"));
+        await Service.ApplyAsync(await Prepare(Snapshot(["A"], "New Name")));
+        Assert.Equal("A", Assert.Single(aliases.FindCandidates("manual name", "reflux").Tags));
+        Assert.Equal("A", Assert.Single(aliases.FindCandidates("Ｎｅｗ name").Tags));
+        Assert.Equal(SongTitleMatchStatus.NotFound, aliases.FindCandidates("A Song").Status);
+        Assert.Equal(1L, Scalar("SELECT COUNT(*) FROM song_aliases;"));
+        Assert.Contains(TitleNormalizer.Version, (string)Scalar("SELECT options_json FROM import_runs ORDER BY import_run_id DESC LIMIT 1;")!);
+    }
 
     [Fact]
     public async Task UpsertPreservesIdentityHistoryAliasesAndDifficultyReferences()
@@ -146,7 +165,7 @@ public sealed class MasterUpdateServiceTests : IDisposable
         var plan = await Prepare(Snapshot("A"));
         var blocked = Path.Combine(directory, "not-a-directory");
         File.WriteAllText(blocked, "original");
-        var service = new MasterUpdateService(Database, blocked, s => s, "identity-test");
+        var service = new MasterUpdateService(Database, blocked);
         await Assert.ThrowsAnyAsync<IOException>(() => service.ApplyAsync(plan));
         Assert.Equal(0L, Scalar("SELECT COUNT(*) FROM import_runs;"));
         Assert.Equal(0L, Scalar("SELECT COUNT(*) FROM songs;"));
@@ -165,7 +184,7 @@ public sealed class MasterUpdateServiceTests : IDisposable
             command.ExecuteNonQuery();
         }
         var before = File.ReadAllBytes(unknown.DatabasePath);
-        var service = new MasterUpdateService(unknown, Path.Combine(directory, "backups"), s => s, "test");
+        var service = new MasterUpdateService(unknown, Path.Combine(directory, "backups"));
         await Assert.ThrowsAsync<AggregateException>(() => service.PrepareAsync(_ => Task.FromResult(Snapshot("A"))));
         Assert.Equal(before, File.ReadAllBytes(unknown.DatabasePath));
     }

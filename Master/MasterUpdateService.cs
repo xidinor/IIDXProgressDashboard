@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using IIDXProgressDashboard.Database;
+using IIDXProgressDashboard.Matching;
 using Microsoft.Data.Sqlite;
 
 namespace IIDXProgressDashboard.Master;
@@ -13,19 +14,12 @@ public sealed class MasterUpdateService
     private const string SourceName = "TEXTAGE_ACTBL_CATALOG_V1";
     private readonly DatabaseInitializer database;
     private readonly string backupDirectory;
-    private readonly Func<string, string> normalizeTitle;
-    private readonly string normalizerVersion;
-
-    // 正規化規則はPhase 2-4で決める。呼出し側が規則と版を明示し、ここでは推測しない。
-    public MasterUpdateService(DatabaseInitializer database, string backupDirectory,
-        Func<string, string> normalizeTitle, string normalizerVersion)
+    // マスター・外部タイトル・aliasで同じ規則と版を使用する。
+    public MasterUpdateService(DatabaseInitializer database, string backupDirectory)
     {
         this.database = database ?? throw new ArgumentNullException(nameof(database));
         ArgumentException.ThrowIfNullOrWhiteSpace(backupDirectory);
         this.backupDirectory = Path.GetFullPath(backupDirectory);
-        this.normalizeTitle = normalizeTitle ?? throw new ArgumentNullException(nameof(normalizeTitle));
-        ArgumentException.ThrowIfNullOrWhiteSpace(normalizerVersion);
-        this.normalizerVersion = normalizerVersion;
     }
 
     public async Task<MasterUpdatePlan> PrepareAsync(Func<CancellationToken, Task<MasterSnapshot>> acquire,
@@ -56,7 +50,7 @@ public sealed class MasterUpdateService
             throw new InvalidDataException("候補と元入力の解析結果が一致しません。");
         var songs = validated.Songs.ToArray();
         var charts = validated.Charts.ToArray();
-        var titles = songs.Select(song => normalizeTitle(song.Title)).ToArray();
+        var titles = songs.Select(song => TitleNormalizer.Normalize(song.Title)).ToArray();
         if (titles.Any(string.IsNullOrWhiteSpace)) throw new InvalidDataException("正規化曲名が空です。");
         using var connection = OpenValidated();
         using var transaction = connection.BeginTransaction(deferred: true);
@@ -78,7 +72,7 @@ public sealed class MasterUpdateService
             && !existingCharts.Any(c => c.Key.Tag == tag && c.Value && !missingChartSet.Contains(c.Key))).ToArray();
         var fingerprint = Hash(JsonSerializer.Serialize(validated.Sources.Files.OrderBy(p => p.Key, StringComparer.Ordinal)
             .Select(p => new { p.Key, p.Value.Sha256, p.Value.ByteLength, p.Value.Encoding })));
-        var state = new MasterUpdateState(1, validated.Scope, validated.ParserVersion, normalizerVersion,
+        var state = new MasterUpdateState(1, validated.Scope, validated.ParserVersion, TitleNormalizer.Version,
             fingerprint, ownedSongs, ownedCharts);
         token.ThrowIfCancellationRequested();
         return new MasterUpdatePlan(database.DatabasePath, Revision(connection, transaction), songs, charts,
