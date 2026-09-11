@@ -25,7 +25,15 @@ public sealed class MasterUpdateServiceTests : IDisposable
         Assert.Equal("A", Assert.Single(aliases.FindCandidates(" a　song ").Tags));
         Assert.Equal("Ａ Song", Scalar("SELECT title FROM songs;"));
         Assert.Equal("A SONG", Scalar("SELECT normalized_title FROM songs;"));
+        // Provider→DB→Resolverを通し、改名後もalias経由で同じ譜面へ到達する。
+        var resolver = new ChartResolver(Database);
+        var resolved = resolver.Resolve(new(" a　song ", "SPA"));
+        Assert.True(resolved.IsResolved);
+        Assert.Equal(Scalar("SELECT chart_id FROM charts;"), resolved.ChartId);
         await Service.ApplyAsync(await Prepare(Snapshot(["A"], "New Name")));
+        Assert.Equal(resolved.ChartId, resolver.Resolve(new("manual name", "SPA", SourceName: "reflux")).ChartId);
+        Assert.Equal(resolved.ChartId, resolver.Resolve(new("Ｎｅｗ name", "SPA")).ChartId);
+        Assert.False(resolver.Resolve(new("A Song", "SPA")).IsResolved);
         Assert.Equal("A", Assert.Single(aliases.FindCandidates("manual name", "reflux").Tags));
         Assert.Equal("A", Assert.Single(aliases.FindCandidates("Ｎｅｗ name").Tags));
         Assert.Equal(SongTitleMatchStatus.NotFound, aliases.FindCandidates("A Song").Status);
