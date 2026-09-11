@@ -1,6 +1,6 @@
 # Phase 2 マスター取得・更新・譜面照合の統合解説
 
-実装・検証時点：2026-09-11。
+実装・検証時点：2026-09-11。項目7の完了判定対象は統合テストをマージした `2609023`（PR #10）。
 対象：[Issue #4](https://github.com/xidinor/IIDXProgressDashboard/issues/4) の6.6「Phase 2 統合テスト」と7「解説・完了判定」。
 基準：[SPECS.md](../SPECS.md) 第4.1・6・9〜12・27・29章、[AGENTS.md](../AGENTS.md)。
 
@@ -49,6 +49,7 @@ SP/DP × B/N/H/A/Lを扱い、旧BeginnerのSBoをSBへ統合しない。
 
 ## API利用例
 
+この例はtagがsongの合成マスターを反映済み、または入力に含むことを前提とする。実際には登録済みtag・譜面条件を指定する。
 以下のパス変数は呼出し側で決定する。出力には既存の旧DBやdata/原本を指定せず、別の新規パスを使う。
 
 ```csharp
@@ -127,7 +128,7 @@ SQLによる履歴・難易度表の準備は参照保全を確認するため�
 テスト側が公開APIを順番に呼んで例外時に停止する構成であり、運用UIの統合を検証するものではない。
 個別の曖昧一致・notes矛盾・alias衝突・再登場・取得失敗・バックアップ復旧等は既存の個別テストで補完する。
 
-2026-09-11の実行結果：
+2026-09-11の項目6.6で実行した結果（項目7での再実行結果ではない）：
 
 - 統合テスト限定実行：9件成功、失敗・スキップ0。
 - dotnet build IIDXProgressDashboard.sln -v quiet：成功、エラー0、警告12件。
@@ -135,7 +136,50 @@ SQLによる履歴・難易度表の準備は参照保全を確認するため�
 - 警告は既存OpenTK / OpenTK.GLControl / SkiaSharp.Views.WindowsFormsのNU1701。互換性解消や配布保証は今回の範囲外。
 - SDK探索が制限されたため許可された権限で検証した。依存パッケージの変更はない。
 
-## 完了判定と残課題
+## 項目7の完了判定
+
+**判定：Issue #4で定義したPhase 2の実装・合成自動検証・解説は完了。実取得データによる運用確認は未完了。**
+Issueでは外部取得元や旧マスターとの照合を独立した任意検証としているため、実データ検証を合成テスト成功に含めず、以下の根拠と制約を分けて判定した。
+
+| 完了条件 | 判定と根拠 |
+| --- | --- |
+| C#だけでマスターを取得・解析できる | 実装済み。[Providerテスト](../tests/IIDXProgressDashboard.Tests/Master/MasterDataProviderTests.cs)で明示文字コードのローカル入力と合成HTTP応答を検証。新APIにPython・旧マスターDB依存はない。実HTTP取得成功の保証ではない |
+| 全体検証後に安全に更新できる | 検証済み。[更新テスト](../tests/IIDXProgressDashboard.Tests/Master/MasterUpdateServiceTests.cs)のAcquisitionAndValidationFailuresOnlyRecordFailure、MidWriteFailureOrCancellationRollsBackAllMasterChangesで全体失敗・rollback・ログを確認 |
+| chart_idと既存参照を保全する | 検証済み。同テストのUpsertPreservesIdentityHistoryAliasesAndDifficultyReferences、MissingItemsRequireConfirmationAndReappearWithSameIdentityで更新・消失・再登場と復旧を確認 |
+| 正規化・aliasの曖昧さを安全に扱う | 検証済み。[正規化テスト](../tests/IIDXProgressDashboard.Tests/Matching/TitleNormalizerTests.cs)で冪等性、[aliasテスト](../tests/IIDXProgressDashboard.Tests/Matching/SongAliasRepositoryTests.cs)で衝突・出典・保全を確認 |
+| 共通ResolverからIDまたは未解決理由を取得できる | 検証済み。[Resolverテスト](../tests/IIDXProgressDashboard.Tests/Matching/ChartResolverTests.cs)で全譜面種別、候補0/1/複数、tag・level・notes矛盾、不明値、非アクティブ、副作用なしを確認 |
+| 取得から照合まで統合検証されている | 検証済み。[統合テスト](../tests/IIDXProgressDashboard.Tests/Phase2IntegrationTests.cs)9件を含む全188件成功、ビルド成功。実運用UIの接続は対象外 |
+| 解説とレビュー可能な変更単位が揃う | 本書に構成図、API例、設計判断、検証結果、残課題、関連リンクを掲載。統合テストは6ac7fc7、先行解説はa015e0b、項目7は専用ブランチで文書変更として分離 |
+
+本判定では、前回検証後のコード・テスト・プロジェクト定義に差分がないことを確認した。
+今回の変更は文書のみのため、AGENTS.mdに従いビルド・テストは再実行していない。Markdownのローカルリンクと差分の空白エラーを確認した。
+各小項目の解説にある「次の工程」「未実装」はその文書の実装時点の記録であり、現在のPhase 2全体の状態は本書を参照する。
+
+## 後続Importerへ渡す契約
+
+Importerは元行を保持したうえでChartResolutionRequestを作り、Resolveを呼ぶ。
+DifficultyはSPA等、またはPlayStyleとB/N/H/A/L（旧長名も対応）を明示し、取得できない任意のlevel/notesはnullにする。
+同期Resolverを大量に呼ぶ場合のUI外実行・キャッシュは呼出し側で検討する。
+
+IsResolvedがtrueの場合だけChartIdを履歴登録へ使う。
+falseの場合は入力1行につき未解決1行とし、主理由はIssues[0].Code、詳細には全Issues・Candidates・TitleEvidence・Requestを保存する契約である。
+完全な元行はImporterが別に保持し、Requestから復元しない。
+DBアクセスやスキーマの例外をSONG_NOT_FOUND等に変換せず、実行失敗として扱う。
+保存処理・source_record_key・再処理・件数・トランザクションはPhase 3/4で実装する。
+詳細な列対応は[Resolver解説](phase2-5-chart-resolver-explained.md)を参照。
+
+## 未確定事項と運用上の残課題
+
+| 事項 | 現在の状態・次に確認すること | 担当範囲 |
+| --- | --- | --- |
+| firstemoのSP/B | 過去の実入力でlevel=0・notes=0・flags=1を検出し、契約どおり全体拒否。取得元の意味を調査してから入力契約・fixtureの変更要否を決める。黙示スキップで成功させない | 実マスターを反映する前の追加調査 |
+| 実HTTP・実カタログ | 今回未実施。取得中変更検知は上流の原子的snapshotや全INFINITAS収録を保証しない | 実運用導入時 |
+| 保存先・起動接続 | 呼出し側指定の新v1 DBを使用。通常保存先・起動時初期化は未接続 | Issue #3 / Phase 6 |
+| 旧履歴 | 移行元の選択、タイムゾーン、分精度、DB識別と重複キーは未確定 | Phase 3 |
+| Reflux | Session識別、途中編集、時刻設定訂正、未解決再処理は未確定 | Phase 4 |
+| UI・配布 | chart単位の表示・集計、旧依存除去、GAC参照やNU1701を含む配布互換性は未検証 | Phase 6/7・配布 |
+
+## DB互換性とv1全体との境界
 
 Phase 2の公開APIを合成入力で接続し、安全な更新と共通照合・未解決理由の取得を確認した。
 今回、本体コード・DBスキーマ・Migrationは変更していない。data/の原本は使用・変更していない。
