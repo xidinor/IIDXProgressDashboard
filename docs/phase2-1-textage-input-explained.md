@@ -1,5 +1,7 @@
 # Phase 2-1：取得元・データ仕様・更新範囲の調査と確定
 
+後続実装：[Phase 2-2の取得・解析](phase2-2-master-provider-explained.md)。以下の先行Readerの説明は実装時点の記録であり、現在のoptions・4ファイル入力・CP932対応は後続文書を参照。
+
 対象は2026-09-07時点。[Phase 2 Issue #4](https://github.com/xidinor/IIDXProgressDashboard/issues/4)の項目1を指す。確定した入力・更新契約は[調査仕様](phase2-1-textage-source-contract.md)を参照。Phase 2全体の完了ではない。以下の読込基盤は項目2に属する先行実装として区別する。
 
 ## 実装した処理
@@ -13,7 +15,7 @@ flowchart LR
     Parser -. 後続工程 .-> DB[検証・UPSERT]
 ```
 
-[TextageSourceReader.cs](../Master/TextageSourceReader.cs)は指定ディレクトリから非同期で読み込む。必須ファイルの不足は一覧で報告し、空入力や不正UTF-8は例外にする。BOMは内容から取り除くが、ハッシュはBOMを含む元バイト列から計算する。キャンセルにも対応する。
+[TextageSourceReader.cs](../Master/Textage/TextageSourceReader.cs)は指定ディレクトリから非同期で読み込む。必須ファイルの不足は一覧で報告し、空入力や不正UTF-8は例外にする。BOMは内容から取り除くが、ハッシュはBOMを含む元バイト列から計算する。キャンセルにも対応する。
 
 ```csharp
 var snapshot = await new TextageSourceReader().ReadAsync(inputDirectory, cancellationToken);
@@ -50,7 +52,7 @@ JSの評価・実行、ネットワーク取得、DB接続は行わない。全�
 
 ## 検証と残課題
 
-[TextageSourceReaderTests.cs](../tests/IIDXProgressDashboard.Tests/TextageSourceReaderTests.cs)は合成入力で、JSを実行しないこと、BOM・ハッシュ・原本保持、複数ファイル不足、空入力、不正UTF-8、キャンセルを検証する。個人のdataには依存しない。実データのファイル存在・UTF-8確認は別途PowerShellで行った。
+[TextageSourceReaderTests.cs](../tests/IIDXProgressDashboard.Tests/Master/Textage/TextageSourceReaderTests.cs)は合成入力で、JSを実行しないこと、BOM・ハッシュ・原本保持、複数ファイル不足、空入力、不正UTF-8、キャンセルを検証する。個人のdataには依存しない。実データのファイル存在・UTF-8確認は別途PowerShellで行った。
 
 ビルドは成功（既存パッケージ互換性・Nullable等の警告あり）。自動テストは既存18件と追加5件の計23件が成功した。DBスキーマ・既存DB・既存UIへの変更はない。
 
