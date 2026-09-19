@@ -14,6 +14,22 @@ public sealed class ChartResolver
     public ChartResolution Resolve(ChartResolutionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var connection = database.OpenConnection();
+        // 空DBを暗黙に初期化しない。単独利用ではここで既存スキーマを検証する。
+        using (var check = connection.CreateCommand())
+        {
+            check.CommandText = "SELECT COUNT(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%';";
+            if ((long)check.ExecuteScalar()! == 0) throw new InvalidOperationException("先に出力用DBを初期化してください。");
+        }
+        new MigrationRunner().Run(connection);
+        using var transaction = connection.BeginTransaction(deferred: true);
+        return Resolve(request, connection, transaction);
+    }
+
+    // Importerでは書込トランザクションと同じsnapshotで照合し、照合後のマスター変更を防ぐ。
+    internal static ChartResolution Resolve(ChartResolutionRequest request, SqliteConnection connection, SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(request);
         var issues = new List<ChartResolutionIssue>();
         var candidates = new List<ChartCandidate>();
         var evidence = new List<SongTitleEvidence>();
@@ -45,15 +61,6 @@ public sealed class ChartResolver
         }
         if (issues.Count > 0) return Result();
 
-        using var connection = database.OpenConnection();
-        // 空DBを初期化しない。既存v1を検証してから同じsnapshotで候補と譜面を読む。
-        using (var check = connection.CreateCommand())
-        {
-            check.CommandText = "SELECT COUNT(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%';";
-            if ((long)check.ExecuteScalar()! == 0) throw new InvalidOperationException("先に出力用DBを初期化してください。");
-        }
-        new MigrationRunner().Run(connection);
-        using var transaction = connection.BeginTransaction(deferred: true);
         var tags = new List<string>();
         if (request.Title is not null)
         {

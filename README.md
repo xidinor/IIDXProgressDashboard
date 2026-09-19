@@ -2,7 +2,7 @@
 
 IIDX / INFINITAS のプレイ履歴をもとに、クリア状況やスコア・BP（ミスカウント）の推移、非公式難易度表ごとの進捗を可視化する Windows 向けデスクトップアプリケーションです。
 
-別添ドキュメントに沿って段階的に改修しています。新DB基盤（Phase 1）の初期DDL・初期化・Migration管理を実装しました。利用方法と保全方針は [Database/README.md](Database/README.md) を参照してください。Phase 2のマスター取得・更新・曲名正規化・譜面照合APIと合成統合テストも実装済みです。[Phase 2の解説・完了判定](docs/phase2-master-matching-explained.md)に利用例、検証根拠、実取得データでの運用確認の残課題をまとめています。履歴取込と既存UIの新DB接続は後続フェーズです。
+別添ドキュメントに沿って段階的に改修しています。新DB基盤（Phase 1）の初期DDL・初期化・Migration管理を実装しました。利用方法と保全方針は [Database/README.md](Database/README.md) を参照してください。Phase 2のマスター取得・更新・曲名正規化・譜面照合APIと合成統合テストも実装済みです。[Phase 2の解説・完了判定](docs/phase2-master-matching-explained.md)に利用例、検証根拠、実取得データでの運用確認の残課題をまとめています。Phase 3の旧履歴取込API、再取込・追記・競合検出・未解決再処理も実装しました。[Phase 3解説](docs/phase3-legacy-importer-explained.md)を参照してください。既存UIの新DB接続と自動移行の起動導線はPhase 6の予定です。
 
 ## 現在できることと制限
 
