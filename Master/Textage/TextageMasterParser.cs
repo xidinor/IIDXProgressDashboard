@@ -37,6 +37,7 @@ public sealed class TextageMasterParser
         foreach (var (tag, value) in titles)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ExcludeNonPlayable(tag, "titletbl.js", diagnostics)) continue;
             if (tag == "__dmy__") { diagnostics.Add(new("DUMMY_EXCLUDED", "titletbl.js", tag, "既知のダミー")); continue; }
             var row = Row(value, 6, 7, $"titletbl.js:{tag}");
             int version = Number(row[0], tag);
@@ -55,6 +56,7 @@ public sealed class TextageMasterParser
         foreach (var (tag, value) in levels)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ExcludeNonPlayable(tag, "actbl.js", diagnostics)) continue;
             if (!tags.Contains(tag)) throw new InvalidDataException($"actbl.js:{tag}: 曲情報がありません。");
             var row = LevelRow(value, $"actbl.js:{tag}");
             if (!notes.TryGetValue(tag, out var noteValue)) throw new InvalidDataException($"datatbl.js:{tag}: 必須tag不足");
@@ -80,6 +82,7 @@ public sealed class TextageMasterParser
         foreach (var (tag, value) in notes)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ExcludeNonPlayable(tag, "datatbl.js", diagnostics)) continue;
             NotesRow(value, tag);
             if (!tags.Contains(tag)) throw new InvalidDataException($"datatbl.js:{tag}: 曲情報がありません。");
         }
@@ -95,6 +98,7 @@ public sealed class TextageMasterParser
                 foreach (var (tag, raw) in Table(cs, key))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (ExcludeNonPlayable(tag, name, diagnostics)) continue;
                     var row = LevelRow(raw, $"{name}:{key}:{tag}");
                     if (!levels.TryGetValue(tag, out var ac)) diagnostics.Add(new("CS_ONLY", name, tag, key));
                     else if (!row.Take(23).SequenceEqual(((List<object>)ac).Take(23))) diagnostics.Add(new("CS_DIFFERENCE", name, tag, key));
@@ -108,6 +112,15 @@ public sealed class TextageMasterParser
         return new(songs.AsReadOnly(), charts.AsReadOnly(), diagnostics.AsReadOnly(), sources);
     }
 
+    // 2026-09-12のユーザー確認：CS DistorteDのTUTORIAL専用曲で通常プレイ不可。
+    // tagの完全一致だけを例外とし、他曲の不正値やファイル全体の構文エラーは拒否する。
+    private static bool ExcludeNonPlayable(string tag, string file, List<MasterDiagnostic> diagnostics)
+    {
+        if (tag != "firstemo") return false;
+        diagnostics.Add(new("NON_PLAYABLE_EXCLUDED", file, tag,
+            "first emotion: CS IIDX 13 DistorteDのTUTORIAL専用曲。通常プレイ対象外"));
+        return true;
+    }
     private static Dictionary<string, object> ReadDocument(string name, string content, CancellationToken cancellation, Dictionary<string, object>? sharedConstants = null)
     {
         var parser = new TextageDataParser(name, content, cancellation);
