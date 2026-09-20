@@ -196,6 +196,11 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-21 Phase 2フォローアップの確定事項
+
+- ユーザー承認：調査したカタログ外17タグは `firstemo` と同じ例外処理とする。完全一致で候補から除外し、`NON_PLAYABLE_EXCLUDED` 診断を残す。元入力は保持し、曲情報補完・別tagへの統合・alias登録はしない。未知のカタログ外tagへ一般化しない。
+- 対象は `conficer`, `dirty_lt`, `elpis`, `era_phat`, `evermess`, `evermesu`, `fujimori`, `gambol_a`, `popteam`, `_100mnm_g`, `_begin13`, `_b_start`, `_c_demae`, `_dltamax`, `_himawri`, `_hnmrpp`, `_meumeu`。用途の推測を確定情報へ昇格させない。詳細は[調査報告](docs/phase2-followup-local-textage-audit.md)を参照。
+
 ### 2026-09-20 Phase 4実装時の確定事項（以下の従来の未確定記述に優先）
 
 - ユーザー承認：Session ID（初回発行・保存するGUID）＋データ行番号をキーとする。コピー・改名は同じID、別Sessionは別ID。rolling hashは既存prefixの変更検出に用い、途中編集・削除・列変更・時刻設定変更を検出したらSession全体の追加を保留する。既存履歴・基準は変更しない。ID変更による競合回避はしない。

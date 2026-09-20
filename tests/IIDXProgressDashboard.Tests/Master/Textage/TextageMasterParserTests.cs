@@ -22,6 +22,60 @@ public sealed class TextageMasterParserTests
         => new(data.ToDictionary(x => x.Key, x => new TextageSourceFile(x.Key, x.Value, Encoding.UTF8.GetByteCount(x.Value), "synthetic")));
     internal static MasterSnapshot Parse(Dictionary<string, string> data) => new TextageMasterParser().Parse(Sources(data));
 
+    [Theory]
+    [InlineData("conficer")]
+    [InlineData("dirty_lt")]
+    [InlineData("elpis")]
+    [InlineData("era_phat")]
+    [InlineData("evermess")]
+    [InlineData("evermesu")]
+    [InlineData("fujimori")]
+    [InlineData("gambol_a")]
+    [InlineData("popteam")]
+    [InlineData("_100mnm_g")]
+    [InlineData("_begin13")]
+    [InlineData("_b_start")]
+    [InlineData("_c_demae")]
+    [InlineData("_dltamax")]
+    [InlineData("_himawri")]
+    [InlineData("_hnmrpp")]
+    [InlineData("_meumeu")]
+    public void ApprovedCatalogExceptionsPreserveSourcesAndRejectUnknownTags(string tag)
+    {
+        // 実入力と同じ孤立notesを合成。意味検査の例外でも元入力は保持する。
+        var data = Fixture();
+        data["datatbl.js"] = data["datatbl.js"].Replace("'song':", $"'{tag}':[], 'song':");
+        var result = Parse(data);
+        Assert.Equal("song", Assert.Single(result.Songs).Tag);
+        Assert.Equal(10, result.Charts.Count);
+        Assert.Single(result.Diagnostics, d => d.Code == "NON_PLAYABLE_EXCLUDED" && d.Tag == tag);
+        Assert.Equal(data["datatbl.js"], result.Sources.Files["datatbl.js"].Content);
+
+        // firstemoと同じく、曲情報・actbl・CS比較でも同一の除外経路を使う。
+        data["titletbl.js"] = data["titletbl.js"].Replace("'song':", $"'{tag}':[], 'song':");
+        data["actbl.js"] = data["actbl.js"].Replace("'song':", $"'{tag}':[], 'song':");
+        data["cstbl.js"] = $"cstbl[13]={{'{tag}':[]}};";
+        data["cstbl1.js"] = "cstbl[3]={};";
+        data["cstbl2.js"] = "cstbl[9]={};";
+        result = Parse(data);
+        Assert.Equal("song", Assert.Single(result.Songs).Tag);
+        Assert.All(result.Charts, c => Assert.Equal("song", c.Tag));
+        Assert.Equal(4, result.Diagnostics.Count(d => d.Code == "NON_PLAYABLE_EXCLUDED" && d.Tag == tag));
+
+        // 正しい行構造でも未承認の孤立tagは拒否。部分一致・大文字小文字の吸収は禁止。
+        foreach (var unknown in new[] { tag + "_other", tag.ToUpperInvariant() })
+        {
+            var invalid = Fixture();
+            invalid["datatbl.js"] = invalid["datatbl.js"].Replace("'song':", $"'{unknown}':[0,0,0,0,0,0,0,0,0,0,0,'120'], 'song':");
+            Assert.Throws<InvalidDataException>(() => Parse(invalid));
+        }
+        var broken = Fixture();
+        broken["datatbl.js"] = $"datatbl={{'{tag}':[";
+        Assert.Throws<InvalidDataException>(() => Parse(broken));
+        var empty = Fixture().ToDictionary(p => p.Key, p => p.Value.Replace("'song'", $"'{tag}'"));
+        Assert.Throws<InvalidDataException>(() => Parse(empty));
+    }
+
     [Fact]
     public void ExcludesOnlyKnownTutorialTagAcrossCatalogAndCsComparison()
     {
