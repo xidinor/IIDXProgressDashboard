@@ -1362,6 +1362,19 @@ Local
 
 # 19. Reflux重複Import防止
 
+### 2026-09-20採用契約（下記の当初rolling hash案に優先）
+
+ユーザー承認により、保存・再利用するSession GUID＋データ行番号をsource_record_keyとする。
+コピー・改名は同じID、別Sessionは別ID。rolling hashは行キーではなく既存prefixの変更検出に使う。
+途中編集・挿入・削除・列変更・時刻設定変更を検出した場合、Session全体の追加を保留し、既存履歴・受理済み基準は変えない。
+UTF-8 BOM・LF/CRLF差だけは許容。既存prefixが不変の追記を受理し、未解決行は元入力が不変なら再照合できる。
+Localは明示TimeZoneIdを必須とし、夏時間の曖昧・存在しない時刻は不正行として残す。
+時刻の自動訂正・ID変更による競合回避は行わない。
+
+暫定1.17.0は、ユーザーがmasterにReflux PR #46・#47を反映した手元ビルド（一般公開バイナリではない）。
+対象commit・入力契約・保留と件数・原本保全・実装範囲は[Phase 4解説](docs/phase4-reflux-session-importer-explained.md)を参照。
+この追記は冒頭に残るSession同一性・永続識別子の未確定記述に優先する。実サンプルのUTC/Local設定は引き続き未確認。
+
 同じSession TSVを何度読み込んでも同じプレイを二重登録してはならない。
 
 DBでは、
