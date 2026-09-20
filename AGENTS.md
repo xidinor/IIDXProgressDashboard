@@ -196,6 +196,15 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-20 Phase 4実装時の確定事項（以下の従来の未確定記述に優先）
+
+- ユーザー承認：Session ID（初回発行・保存するGUID）＋データ行番号をキーとする。コピー・改名は同じID、別Sessionは別ID。rolling hashは既存prefixの変更検出に用い、途中編集・削除・列変更・時刻設定変更を検出したらSession全体の追加を保留する。既存履歴・基準は変更しない。ID変更による競合回避はしない。
+- UTF-8 BOM有無とLF/CRLF差は同一性を維持する。列順・任意列の増減も既存Sessionでは変更扱い。初回はヘッダー駆動で受理する。
+- UTCが初期値。Localは明示的なTimeZoneId必須。曖昧・存在しない夏時間の時刻は不正行。実サンプルのuselocaltime設定は未確認。
+- 元行が不変なら未解決行を再照合し、登録後は過去の同じ元行のPENDINGをRESOLVEDにする。不正行・未解決行は試行ごとに記録。実行件数・全体保留・復旧の詳細は[Phase 4解説](docs/phase4-reflux-session-importer-explained.md)を参照。
+- ユーザー確認：暫定1.17.0はmasterに公開PR #46・#47を反映して手元でビルドしたもの。一般公開バイナリではない。上流の固定commitと出力コードを比較したが、手元の統合commitと実機IIDXビルドは未確認。
+- Phase 4のReader・変換・Importer APIを実装。Session管理・設定永続化・UIはPhase 6。既存DDLは変更せず、Session基準をimport_runs.options_jsonに保持する。通常動作のDB置換・実データ移行完了を意味しない。
+
 以下は仕様の確定事項として扱わず、該当フェーズで実データ・実装を調査して決定する。履歴の意味や重複判定を変える選択に複数の妥当な案が残る場合は、影響を示してユーザーへ確認する。
 
 - 2026-09-19承認済み：呼出し側が保存・再利用する移行元ID（GUID）＋旧idを取込キーとする。コピー・改名は同じ移行元ID、別DBは別ID。同じキーの内容変更は競合として保持し、自動上書き・別プレイ追加をしない。入力からの削除を新履歴へ反映しない。IDの設定保存・自動再利用のUI接続はPhase 6で実装する。
