@@ -116,9 +116,19 @@ public sealed class TextageMasterParser
     // tagの完全一致だけを例外とし、他曲の不正値やファイル全体の構文エラーは拒否する。
     private static bool ExcludeNonPlayable(string tag, string file, List<MasterDiagnostic> diagnostics)
     {
-        if (tag != "firstemo") return false;
-        diagnostics.Add(new("NON_PLAYABLE_EXCLUDED", file, tag,
-            "first emotion: CS IIDX 13 DistorteDのTUTORIAL専用曲。通常プレイ対象外"));
+        // 2026-09-21承認：調査済みのカタログ外17タグも同じ経路で除外する。
+        // 用途不明を推測で補完せず、元入力はSourcesに保持。未知tagへ一般化しない。
+        string? reason = tag switch
+        {
+            "firstemo" => "first emotion: CS IIDX 13 DistorteDのTUTORIAL専用曲。通常プレイ対象外",
+            "conficer" or "dirty_lt" or "elpis" or "era_phat" or "evermess" or
+            "evermesu" or "fujimori" or "gambol_a" or "popteam" or "_100mnm_g" or
+            "_begin13" or "_b_start" or "_c_demae" or "_dltamax" or "_himawri" or
+            "_hnmrpp" or "_meumeu" => "2026-09-21承認のカタログ外tag。過去・未収録・用途未確定のデータとして保持し、AC/INFINITASスコア管理の候補から除外",
+            _ => null
+        };
+        if (reason is null) return false;
+        diagnostics.Add(new("NON_PLAYABLE_EXCLUDED", file, tag, reason));
         return true;
     }
     private static Dictionary<string, object> ReadDocument(string name, string content, CancellationToken cancellation, Dictionary<string, object>? sharedConstants = null)
