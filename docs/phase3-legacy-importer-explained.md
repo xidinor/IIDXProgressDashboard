@@ -138,3 +138,7 @@ var rerun = await importer.ImportAsync(selectedSourcePath, savedSourceId, cancel
 - Phase 6：移行元IDの設定管理、起動時自動移行、実行結果・競合の表示。
 - 別途設計：競合訂正API、譜面修正と誤照合を区別したnotes不一致の再解決、複数DB併用時の調停。
 - Phase 4 Refluxの採用判断・実装は今回の対象外。
+
+## 2026-09-21 実入力検証の追記
+
+修正後の正式Textageマスターを使った[旧履歴の実入力検証](phase3-followup-real-legacy-validation.md)を実施した。旧統合DBは3,413行中3,176行、旧ログは2,382行中2,155行を登録し、残りは理由付きで保持した。再取込・バックアップ復旧・原本不変を確認済み。上記の「実データ全件の照合・移行は未実施」は2026-09-19時点の記録であり、この追記を最新とする。運用DB置換、alias整備後の実入力再処理、UI接続は未実施。
