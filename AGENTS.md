@@ -200,10 +200,18 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-21 Phase 5-2の確定事項
+
+- ユーザー承認：難易度表は1表単位で反映する。完全取得・有効入力の照合未解決は保留し、一意に解決できた正常行を反映する。不完全取得・不正・重複競合は表全体を保留する。
+- ユーザー承認：取得元からの消失が1件でもあれば具体的な差分の確認まで反映を保留する。確認後も欠落エントリーは自動削除せず保持する。☆12の空評価は専用UNRATED（評価未割当）、Wikiの未定はUNDECIDEDとして区別する。非アクティブ曲・譜面も安全に一意照合できれば表に登録し、曲・譜面の活動状態は変更しない。
+- 表・ランクの安定コード、並び順、所有状態、SUCCESS/PARTIAL/FAILEDと件数、元行保存・現在世代のみの再処理は[Phase 5-2契約](docs/phase5-2-difficulty-update-contract.md)を参照。この方針では追加Migrationは不要。保持した旧評価と今回の入力で確認できた評価を区別する。
+- HTML解析はユーザー提案を踏まえAngleSharpを採用する方針。バージョン固定・依存追加・配布影響の実測・Parser検証はPhase 5-3で行う。取得手段とHTML解析を分離し、AngleSharpによるBot対策の解決を前提にしない。
+- 今回は契約確定であり、Provider・照合接続・DB反映はPhase 5-3以降。個人DB・DDL・通常UIは変更しない。
+
 ### 2026-09-21 Phase 5-1の採用元
 
 - ユーザー承認：初期4表は☆11 NORMAL/HARDにWiki、☆12 NORMAL/HARDにINFINITAS-ScoreViewerが参照する元JSON（iidx-sp12.github.io/songs.json）を使用する。CheckerとScoreViewer系の変換済みJSONは比較資料とし、単純結合・無断の取得元切替をしない。
-- [Phase 5-1入力契約](docs/phase5-1-difficulty-source-contract.md)に構造・出典・取得障害・検証条件を記録した。これはProvider実装やDB反映の完了ではない。空評価の保存、表・ランク識別、更新・欠落・監査の契約はPhase 5-2で決める。
+- [Phase 5-1入力契約](docs/phase5-1-difficulty-source-contract.md)に構造・出典・取得障害・検証条件を記録した。これはProvider実装やDB反映の完了ではない。空評価の保存、表・ランク識別、更新・欠落・監査は上記Phase 5-2契約で確定した。
 
 ### 2026-09-21 Phase 2フォローアップの確定事項
 
