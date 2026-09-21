@@ -269,6 +269,46 @@ public sealed class MasterUpdateServiceTests : IDisposable
     }
 
     private Task<MasterUpdatePlan> Prepare(MasterSnapshot snapshot) => Service.PrepareAsync(_ => Task.FromResult(snapshot));
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    [InlineData("unknown", false)]
+    public async Task ParserUpgradePreservesKnownOwnershipOnly(string version, bool supported)
+    {
+        await Service.ApplyAsync(await Prepare(Snapshot("A", "B")));
+        SeedReferences();
+        using (var connection = Database.OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE import_runs SET options_json=json_set(options_json,'$.ParserVersion',$version) WHERE status='SUCCESS';";
+            command.Parameters.AddWithValue("$version", version);
+            command.ExecuteNonQuery();
+        }
+        if (supported)
+        {
+            var plan = await Prepare(Snapshot("A"));
+            Assert.Equal(new[] { "B" }, plan.MissingSongs);
+            Assert.Equal("2", plan.State.ParserVersion);
+            await Service.ApplyAsync(plan, true);
+        }
+        else await Assert.ThrowsAsync<InvalidDataException>(() => Prepare(Snapshot("A")));
+        AssertReferences();
+    }
+
+    [Fact]
+    public async Task JavaScriptSyntaxFailurePreservesDatabaseAndRecordsFailedRun()
+    {
+        await Service.ApplyAsync(await Prepare(Snapshot("A", "B")));
+        SeedReferences();
+        var data = TextageMasterParserTests.Fixture();
+        data["datatbl.js"] += "function broken(){const x;}";
+        await Assert.ThrowsAsync<InvalidDataException>(() => Service.PrepareAsync(_ => Task.FromResult(TextageMasterParserTests.Parse(data))));
+        Assert.Equal(2L, Scalar("SELECT COUNT(*) FROM songs;"));
+        Assert.Equal("FAILED", Scalar("SELECT status FROM import_runs ORDER BY import_run_id DESC LIMIT 1;"));
+        Assert.Equal(0L, Scalar("SELECT records_imported FROM import_runs ORDER BY import_run_id DESC LIMIT 1;"));
+        AssertReferences();
+    }
     private static MasterSnapshot Snapshot(params string[] tags) => Snapshot(tags, null);
     private static MasterSnapshot Snapshot(string[] tags, string? title, int level = 11, int notes = 1000)
     {

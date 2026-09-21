@@ -209,7 +209,10 @@ public sealed class MasterUpdateService
         var state = json is string value ? JsonSerializer.Deserialize<MasterUpdateState>(value) : null;
         if (state is null || state.FormatVersion != 1 || state.Scope != SourceName || state.OwnedSongs is null || state.OwnedCharts is null)
             throw new InvalidDataException("前回マスター更新の所有範囲を解釈できません。");
-        if (state.ParserVersion != "1") throw new InvalidDataException("前回とParser規則版が異なるため、所有範囲を引き継げません。");
+        // v2は文法解析をAcornimaへ変更したが、所有範囲・譜面キー・例外tagの意味はv1と同じ。
+        // 既知のv1状態だけは引き継ぎ、今回入力をv2で全文再検証してから新しい状態を保存する。
+        if (state.ParserVersion != "1" && state.ParserVersion != MasterSnapshot.CurrentParserVersion)
+            throw new InvalidDataException("前回とParser規則版が異なるため、所有範囲を引き継げません。");
         return state;
     }
 

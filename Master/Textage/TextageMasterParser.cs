@@ -133,61 +133,7 @@ public sealed class TextageMasterParser
     }
     private static Dictionary<string, object> ReadDocument(string name, string content, CancellationToken cancellation, Dictionary<string, object>? sharedConstants = null)
     {
-        var parser = new TextageDataParser(name, content, cancellation);
-        var data = new Dictionary<string, object>(StringComparer.Ordinal);
-        if (sharedConstants is not null)
-            foreach (var (key, value) in sharedConstants.Where(p => p.Key is "A" or "B" or "C" or "D" or "E" or "F"))
-                parser.Constants.Add(key, value);
-        while (parser.Peek().Kind != "eof")
-        {
-            var token = parser.Take();
-            if (token.Kind != "identifier") throw parser.Error("データ代入が必要です。");
-            string key = token.Text;
-            // 実ファイルの表示部分への入口だけを許可。対象リテラル内には適用しない。
-            if ((name == "scrlist.js" && key == "referstr") || (name == "datatbl.js" && key == "function"))
-            { parser.SkipDisplayCode(); break; }
-            bool allowed = name switch
-            {
-                "titletbl.js" => key is "titletbl" or "SS" or "VERINDEX" or "IDINDEX" or "OPTINDEX" or "GENREINDEX" or "ARTISTINDEX" or "TITLEINDEX" or "SUBTITLEINDEX",
-                "actbl.js" => key is "actbl" or "pspver" or "A" or "B" or "C" or "D" or "E" or "F" or "e_list" or "s_list" or "s_list_cc" or "d_list" or "d_list_cc",
-                "datatbl.js" => key == "datatbl",
-                "scrlist.js" => key == "vertbl",
-                _ => key is "cstbl" or "cs_elist" or "cs_slist" or "cs_dlist"
-            };
-            if (!allowed) throw parser.Error($"未対応の代入: {key}");
-            if (parser.Match("["))
-            {
-                var index = parser.Value();
-                key += $"[{Number(index, name)}]";
-                parser.Expect("]");
-            }
-            parser.Expect("=");
-            object value;
-            if (parser.Peek().Text == "new" && key is "cstbl" or "cs_elist" or "cs_slist" or "cs_dlist")
-            {
-                parser.Take();
-                if (parser.Take().Text != "Array") throw parser.Error("未対応のnew式");
-                parser.Expect("("); parser.Expect(")"); value = new List<object>();
-            }
-            else value = parser.Value();
-            if (!data.TryAdd(key, value)) throw parser.Error($"重複代入: {key}");
-            if (key is "A" or "B" or "C" or "D" or "E" or "F" or "SS")
-            {
-                if (value is not int) throw parser.Error("定数値が不正です。");
-                if (key != "SS" && (int)value != key[0] - 'A' + 10) throw parser.Error("A〜F定数の定義が変更されています。");
-                parser.Constants[key] = value;
-            }
-            var columnConstants = new[] { "VERINDEX", "IDINDEX", "OPTINDEX", "GENREINDEX", "ARTISTINDEX", "TITLEINDEX", "SUBTITLEINDEX" };
-            int expected = Array.IndexOf(columnConstants, key);
-            if (expected >= 0 && !Equals(value, expected)) throw parser.Error($"列定義が変更されています: {key}");
-            if (parser.Match(","))
-            {
-                if (key is not ("A" or "B" or "C" or "D" or "E" or "F")) throw parser.Error("未対応の連続代入です。");
-                if (parser.Peek().Kind == "eof") throw parser.Error("連続代入が途中で終了しました。");
-            }
-            else parser.Expect(";");
-        }
-        return data;
+        return new TextageAstReader(name, content, cancellation).Read(sharedConstants);
     }
 
     private static Dictionary<string, object> Table(Dictionary<string, object> document, string key)

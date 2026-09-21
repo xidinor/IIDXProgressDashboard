@@ -8,6 +8,7 @@ public sealed record MasterSnapshot(
     TextageSourceSnapshot Sources)
 {
     public string Scope => "TEXTAGE_ACTBL_CATALOG_V1";
-    public string ParserVersion => "1";
+    internal const string CurrentParserVersion = "2";
+    public string ParserVersion => CurrentParserVersion;
     public bool CanDeactivateMissing => false;
 }
