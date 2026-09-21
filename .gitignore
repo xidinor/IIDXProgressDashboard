@@ -375,3 +375,6 @@ FodyWeavers.xsd
 
 # Local Textage master JavaScript snapshots
 /data/**/*.js
+
+# Local atwiki HTML snapshots (not redistributable test fixtures)
+/data/atwiki/

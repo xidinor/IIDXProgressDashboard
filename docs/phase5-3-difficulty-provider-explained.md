@@ -82,4 +82,37 @@ UTF-8を厳密に復号する。1入力8 MiBをHTTP Content-Lengthとストリ�
 - Wiki NORMALへの通常HTTPはchallengeで拒否。Codexブラウザーでは16節・ヘッダー込み624行と想定TexTage形式を確認。これは新C# Parserで実Wiki全行を通した検証ではない。HARDの今回の実入力検証も未実施。
 - 個人DB、旧DB、DDL、通常UI、既存履歴は変更していない。
 
-次に必要なのはWiki本番取得アダプターの実証・実装と、採取した両Wikiを新C# Parserへ通す検証。challenge時は診断して保留し、他出典へ切り替えない。これらが残るためPhase 5-3全体の完了チェックは付けない。5-4のResolver接続、5-5の監査・安全なDB更新、5-6の実4表統合検証も別工程として残る。
+上記は保存HTML提供前の検証記録。両Wikiの実Parser検証は次の追補で完了した。ブラウザーによる自動取得の実証・実装は引き続き残り、Phase 5-3全体の完了チェックは付けない。5-4のResolver接続、5-5の監査・安全なDB更新、5-6の実4表統合検証も別工程として残る。
+
+## 2026-09-22追補: 利用者が保存したWiki HTML
+
+利用者から提供された `data/atwiki/` のNORMAL/HARD HTMLを読み取り専用で検証した。既存Parserの修正は不要だった。原本はGitへ追加せず、同ディレクトリを `.gitignore` に追加した。個人DB・DDL・通常UIは変更していない。
+
+```mermaid
+flowchart LR
+    F[利用者が明示した保存HTML] --> R[ReadSavedHtmlAsync: 読み取り専用・容量制限]
+    R --> S[SAVED_HTML: 原本本文・SHA256]
+    S --> P[既存Parser: 題名・16節・全行検査]
+    P --> O[候補と診断]
+    R --> E[読込失敗: FAILED / NOT_RUN]
+```
+
+`DifficultyTableProvider.ReadSavedHtmlAsync(kind, path, token)`を追加した。☆11専用で、選択された表の題名と構造を検証する。ファイル名は表識別に使わない。非同期読込、厳密UTF-8、読込前と読込中の8 MiB上限、キャンセルに対応する。読込失敗の診断にはOS例外中の個人パスを含めない。解析失敗でも読めた元本文を保持する。
+
+取得種別に `SAVED_HTML` を追加する。開始・終了日時はローカルの読込日時であり、Web取得日時ではない。HTTP status/content-type、ETag、Last-Modified、上流revisionは不明のままNULL。URLは利用者が選択した表の契約URLであり、ファイルの採取元をネットワークで証明した意味ではない。mtimeからWeb取得日時を推測しない。HTTP_BODY/BROWSER_DOMとの行キーは分離される。既存入力のキー・ParserVersion・ContractVersionは変更していない。後続5-5ではこの取得種別も監査に保存する。
+
+この経路は利用者が保存ファイルを明示した場合だけ呼び出す。`FetchAsync` / `FetchAllAsync` の失敗から自動でローカルファイルへ切り替えず、HTTPキャッシュも更新しない。ブラウザーランタイムや新たな依存は追加していない。
+
+|実入力|バイト数|曲行|H / A / L|診断|
+|---|---:|---:|---|---:|
+|NORMAL|718,507|608|27 / 541 / 40|0|
+|HARD|717,261|608|27 / 541 / 40|0|
+
+新APIから両表を読み、COMPLETE / VALIDを確認した。実行前後のSHA-256は不変だった。
+
+- NORMAL: `6C758DCD7F84798C66224BEC61D9B0AA0E874A19CFD3DF78588A000FEE041BC9`
+- HARD: `81B78DADC2D46CCF51AA91D8106B6280109C22688B08A29019339108DB5A7705`
+
+これは保存スナップショットの解析検証であり、最新サイトの自動取得、chart_id照合、DB適用の成功ではない。
+
+`dotnet build IIDXProgressDashboard.sln --no-restore`成功（既存警告21、エラー0）。`dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj --no-build --no-restore`は369件成功、失敗・スキップ0。最初のsandbox内実行はSDKディレクトリ参照制限で失敗し、許可された制限外実行で確認した。追加3ケースは両表読込、BOM・原本・キー保持、表取り違え、HTTPキャッシュとの分離、不正UTF-8、容量超過、challenge、キャンセル、対象外表、ファイル不在を合成入力で検証した。実HTMLはCIへ持ち込んでいない。今回publishは再実行していない。
