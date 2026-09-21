@@ -131,3 +131,9 @@ DB反映の原子性・バックアップ・import_runs記録は項目3の担当
 ユーザー確認により、firstemoはCS版IIDX 13 DistorteDのTUTORIAL専用曲first emotionで通常プレイ不能と判明した。
 tag完全一致で通常マスター・CS比較の意味処理から除外し、NON_PLAYABLE_EXCLUDED診断を残す。
 ファイル全体の構文検証と他曲の矛盾検出は維持する。詳細は[統合解説の追記](phase2-master-matching-explained.md)を参照。
+
+## 2026-09-21：JavaScript解析ライブラリへの移行
+
+Issue #13項目3で、自作解析をAcornima 1.8.0の全文AST解析へ置換した。Esprimaのアーカイブを確認し、ユーザー承認によりAcornimaを採用。Textage固有の抽出・意味検証と承認済み例外は維持する。ParserVersionは2、版1の同一所有範囲は明示的に互換とする。
+
+現行の受理・拒否、サイズ・深さ・キャンセル制約、標準JSとの差、検証結果は[Acornima移行解説](phase2-followup-acornima-parser.md)を参照。従来の表示コードは括弧境界だけの検証だったが、現在は全文文法を検証し、不正な表示コードも全体失敗にする。先頭ゼロ付き複数桁整数は解釈差を防ぐため拒否する。
