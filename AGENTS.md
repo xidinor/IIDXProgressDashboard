@@ -199,6 +199,11 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-21 Phase 5-1の採用元
+
+- ユーザー承認：初期4表は☆11 NORMAL/HARDにWiki、☆12 NORMAL/HARDにINFINITAS-ScoreViewerが参照する元JSON（iidx-sp12.github.io/songs.json）を使用する。CheckerとScoreViewer系の変換済みJSONは比較資料とし、単純結合・無断の取得元切替をしない。
+- [Phase 5-1入力契約](docs/phase5-1-difficulty-source-contract.md)に構造・出典・取得障害・検証条件を記録した。これはProvider実装やDB反映の完了ではない。空評価の保存、表・ランク識別、更新・欠落・監査の契約はPhase 5-2で決める。
+
 ### 2026-09-21 Phase 2フォローアップの確定事項
 
 - ユーザー承認：調査したカタログ外17タグは `firstemo` と同じ例外処理とする。完全一致で候補から除外し、`NON_PLAYABLE_EXCLUDED` 診断を残す。元入力は保持し、曲情報補完・別tagへの統合・alias登録はしない。未知のカタログ外tagへ一般化しない。
