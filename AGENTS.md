@@ -244,3 +244,9 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 - 残課題と次の工程
 
 v1全体の完了判定は元仕様第29章に従う。部分実装やビルド成功だけをv1完了と報告しない。
+
+### 2026-09-21 Phase 2フォローアップのJavaScript解析
+
+- Issue #13項目3の候補Esprimaはアーカイブ済みだったため、ユーザー承認によりAcornima 1.8.0を採用。入力は実行せず全文AST解析とTextage固有の抽出・意味検証に分ける。
+- ParserVersionは2。同じ所有範囲の既知の版1状態だけは引き継ぎ、未知版は拒否する。DBスキーマや譜面識別は変更しない。
+- 入力制限・互換性・検証・配布影響は[Acornima移行解説](docs/phase2-followup-acornima-parser.md)を参照。

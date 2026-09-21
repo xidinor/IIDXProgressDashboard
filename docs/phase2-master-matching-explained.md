@@ -208,3 +208,7 @@ DBスキーマ・ParserVersion・所有範囲形式は変更しない。既存�
 dotnet build IIDXProgressDashboard.sln --no-restoreは成功、エラー0、既存NU1701警告6件。
 追加の合成テストではカタログ・CS比較での限定除外、類似tag非除外、構文破損、空候補、通常曲のflags矛盾の拒否を確認した。
 実入力全件の再検証・DB反映は未実施。
+
+## 2026-09-21：Issue #13項目3の解析移行
+
+JavaScript全文の文法解析をAcornima 1.8.0へ移し、Textage固有のAST読取・意味検証に分離した。ParserVersionは2となり、既知の版1所有範囲は引き継ぐ。採用理由・入力制約・検証・配布影響は[Acornima移行解説](phase2-followup-acornima-parser.md)を参照。この変更は通常DB置換やPhase 6の運用接続完了を意味しない。

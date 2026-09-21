@@ -41,7 +41,7 @@ flowchart TD
 | --- | --- |
 | [MasterDataProvider.cs](../Master/MasterDataProvider.cs) | ローカル・HTTPの取得と解析の非同期入口 |
 | [TextageSourceReader.cs](../Master/Textage/TextageSourceReader.cs) | 厳密な復号、元バイト情報、読込後の再確認 |
-| [TextageDataParser.cs](../Master/Textage/TextageDataParser.cs) | コメント・文字列・escape・配列・objectを区別する内部Parser |
+| [現行TextageAstReader.cs](../Master/Textage/TextageAstReader.cs) | コメント・文字列・escape・配列・objectを区別する内部Parser |
 | [TextageMasterParser.cs](../Master/Textage/TextageMasterParser.cs) | 許可した代入の解析、モデル変換、全体検証 |
 | [MasterSnapshot.cs](../Master/Models/MasterSnapshot.cs) | 曲・譜面候補、診断、取得情報、更新範囲 |
 
@@ -98,7 +98,7 @@ MasterSnapshotのScopeは `TEXTAGE_ACTBL_CATALOG_V1`、ParserVersionは `1`。Ca
 | --- | --- |
 | [TextageSourceReaderTests](../tests/IIDXProgressDashboard.Tests/Master/Textage/TextageSourceReaderTests.cs) | 従来の19件を維持。名前・内容・復号・原本・余分なファイル・キャンセル |
 | [TextageMasterParserTests](../tests/IIDXProgressDashboard.Tests/Master/Textage/TextageMasterParserTests.cs) | 10譜面種別、NULL、不存在、SBo、HTML、未知式・版・列、欠落・重複、CS比較 |
-| [TextageDataParserTests](../tests/IIDXProgressDashboard.Tests/Master/Textage/TextageDataParserTests.cs) | 内部状態・escape・コメント・nest・末尾comma・EOF・不正token・表示コード境界 |
+| [現行TextageAstContractTests](../tests/IIDXProgressDashboard.Tests/Master/Textage/TextageAstContractTests.cs) | 内部状態・escape・コメント・nest・末尾comma・EOF・不正token・表示コード境界 |
 | [MasterDataProviderTests](../tests/IIDXProgressDashboard.Tests/Master/MasterDataProviderTests.cs) | ローカル4ファイル、UTF-8/CP932、HTTP再検証、通信・復号・解析失敗、取得途中キャンセル |
 
 配置整理後も自動テストは合計114件成功、失敗・スキップ0。既存DBテストも含む。ソリューション全体のビルドも成功（エラー0、既存パッケージ互換性・Nullable等の警告21件）。新処理の通常動作はC#のみで、追加パッケージやPython実行依存はない。
@@ -110,3 +110,7 @@ MasterSnapshotのScopeは `TEXTAGE_ACTBL_CATALOG_V1`、ParserVersionは `1`。Ca
 ## 次の工程
 
 Phase 2-3でMasterSnapshotを新DBへ安全に反映する処理を実装する。配置済みデータを実際に登録する前に、firstemoのような外部データと契約の不整合について取得元の意味を追加調査する必要がある。今回の実装では不正行を除いて完全snapshotにする変更は行っていない。
+
+## 2026-09-21の後続変更
+
+本書の旧字句解析処理はAcornima 1.8.0とTextageAstReaderへ置換した。本文はPhase 2-2当時の記録であり、現行の構成・ParserVersion 2・検証は[Acornima移行解説](phase2-followup-acornima-parser.md)を参照。
