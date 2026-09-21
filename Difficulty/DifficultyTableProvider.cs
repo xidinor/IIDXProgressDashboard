@@ -30,6 +30,41 @@ public sealed class DifficultyTableProvider(HttpClient client)
     public Task<DifficultyParseResult> ParseAsync(DifficultyTableKind kind, DifficultySource source, CancellationToken token = default)
         => Task.Run(() => parser.Parse(kind, source, token), token);
 
+    /// <summary>利用者が明示したWiki保存HTMLを読み取る。HTTP失敗からの自動切替やキャッシュ更新はしない。</summary>
+    public async Task<DifficultyParseResult> ReadSavedHtmlAsync(DifficultyTableKind kind, string path, CancellationToken token = default)
+    {
+        var table = DifficultyTableDefinition.Get(kind);
+        if (table.Level != 11) throw new ArgumentException("保存HTMLは☆11 Wiki専用です。", nameof(kind));
+        DifficultySource? source = null;
+        var started = DateTimeOffset.UtcNow;
+        token.ThrowIfCancellationRequested();
+        try
+        {
+            // 原本は読み取り専用。ファイル名・更新日時を出典URLやサイト取得日時として推測しない。
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                16384, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (stream.Length > DifficultySource.MaxBytes) throw new InvalidDataException("入力上限8 MiBを超えています。");
+            using var buffer = new MemoryStream();
+            var chunk = new byte[16384];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, token).ConfigureAwait(false)) > 0)
+            {
+                if (buffer.Length + read > DifficultySource.MaxBytes) throw new InvalidDataException("入力上限8 MiBを超えています。");
+                buffer.Write(chunk, 0, read);
+            }
+            source = DifficultySource.FromUtf8(table.Url, buffer.ToArray(), "SAVED_HTML") with
+            { StartedAt = started, CompletedAt = DateTimeOffset.UtcNow };
+            return await ParseAsync(kind, source, token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or DecoderFallbackException)
+        {
+            // OS例外本文に含まれる個人の絶対パスを、永続化され得る診断へ持ち込まない。
+            return new(table, source, Array.Empty<DifficultySourceRow>(),
+                Array.AsReadOnly(new[] { new DifficultyDiagnostic("SAVED_HTML_READ_FAILED", $"保存HTMLを読み取れませんでした ({ex.GetType().Name})。") }),
+                "FAILED", "NOT_RUN", false);
+        }
+    }
+
     public async Task<DifficultyParseResult> FetchAsync(DifficultyTableKind kind, CancellationToken token = default)
     {
         var table = DifficultyTableDefinition.Get(kind);

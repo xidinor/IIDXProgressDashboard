@@ -198,6 +198,67 @@ public sealed class DifficultyProviderTests
         Assert.Equal((int)status, result.Source!.HttpStatus); Assert.Equal(1, handler.Count);
     }
 
+    [Theory]
+    [InlineData(DifficultyTableKind.Sp11Normal)]
+    [InlineData(DifficultyTableKind.Sp11Hard)]
+    public async Task Saved_html_preserves_bytes_and_is_explicitly_separate_from_http(DifficultyTableKind kind)
+    {
+        // 保存元の実HTMLに依存せず、BOMを含む合成入力で原本不変と取得方式を確認する。
+        string path = Path.GetTempFileName();
+        try
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes("\uFEFF" + Wiki(kind));
+            await File.WriteAllBytesAsync(path, bytes);
+            var handler = new StubHandler(HttpStatusCode.Forbidden, "blocked", "text/html");
+            using var client = new HttpClient(handler);
+            var provider = new DifficultyTableProvider(client);
+            var result = await provider.ReadSavedHtmlAsync(kind, path);
+            Assert.True(result.IsValid);
+            Assert.Equal("SAVED_HTML", result.Source!.InputKind);
+            Assert.Null(result.Source.HttpStatus);
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+            Assert.Equal(0, handler.Count);
+            Assert.Equal(result.Rows[0].RecordKey, (await provider.ReadSavedHtmlAsync(kind, path)).Rows[0].RecordKey);
+            Assert.NotEqual(Parse(kind, "\uFEFF" + Wiki(kind)).Rows[0].RecordKey, result.Rows[0].RecordKey);
+            // 保存ファイル成功が、その後のHTTP失敗を隠さない。
+            Assert.Equal("FAILED", (await provider.FetchAsync(kind)).AcquisitionStatus);
+            Assert.Equal(1, handler.Count);
+            var wrong = kind == DifficultyTableKind.Sp11Normal ? DifficultyTableKind.Sp11Hard : DifficultyTableKind.Sp11Normal;
+            Assert.False((await provider.ReadSavedHtmlAsync(wrong, path)).IsValid);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task Saved_html_reports_read_errors_and_honors_cancellation()
+    {
+        string path = Path.GetTempFileName();
+        using var client = new HttpClient();
+        var provider = new DifficultyTableProvider(client);
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0xff]);
+            var invalid = await provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp11Normal, path);
+            Assert.Equal("FAILED", invalid.AcquisitionStatus);
+            Assert.Null(invalid.Source);
+            Assert.DoesNotContain(path, Assert.Single(invalid.Diagnostics).Detail);
+            await File.WriteAllBytesAsync(path, new byte[DifficultySource.MaxBytes + 1]);
+            Assert.Equal("FAILED", (await provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp11Normal, path)).AcquisitionStatus);
+            await File.WriteAllTextAsync(path, "<html><title>Just a moment...</title></html>");
+            var challenge = await provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp11Normal, path);
+            Assert.False(challenge.IsValid);
+            Assert.NotNull(challenge.Source);
+            using var cancel = new CancellationTokenSource();
+            cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp11Normal, path, cancel.Token));
+            await Assert.ThrowsAsync<ArgumentException>(() => provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp12Normal, path));
+        }
+        finally { File.Delete(path); }
+        var missing = await provider.ReadSavedHtmlAsync(DifficultyTableKind.Sp11Normal, path);
+        Assert.Equal("FAILED", missing.AcquisitionStatus);
+        Assert.DoesNotContain(path, Assert.Single(missing.Diagnostics).Detail);
+    }
+
     private sealed class StubHandler(HttpStatusCode status, string text, string contentType) : HttpMessageHandler
     {
         public int Count { get; private set; }

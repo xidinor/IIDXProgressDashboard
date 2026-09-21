@@ -46,7 +46,7 @@ public sealed record DifficultySource(string RequestedUrl, string FinalUrl, stri
     public static DifficultySource FromUtf8(string url, byte[] bytes, string inputKind = "HTTP_BODY")
     {
         if (bytes.Length > MaxBytes) throw new InvalidDataException("入力上限8 MiBを超えています。");
-        if (inputKind is not ("HTTP_BODY" or "BROWSER_DOM")) throw new ArgumentException("未知の入力種別です。", nameof(inputKind));
+        if (inputKind is not ("HTTP_BODY" or "BROWSER_DOM" or "SAVED_HTML")) throw new ArgumentException("未知の入力種別です。", nameof(inputKind));
         var text = new UTF8Encoding(false, true).GetString(bytes);
         var now = DateTimeOffset.UtcNow;
         return new(url, url, inputKind, text, Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, now, now);
