@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="Acornima" Version="1.8.0" />
+    <PackageReference Include="AngleSharp" Version="1.8.2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
     <PackageReference Include="ScottPlot.WinForms" Version="5.1.57" />
   </ItemGroup>
@@ -22,6 +23,7 @@
 
   <ItemGroup>
     <Folder Include="python\" />
+    <None Update="ThirdParty/AngleSharp/LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <None Update="ThirdParty/Acornima/LICENSE;ThirdParty/Acornima/NOTICE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <EmbeddedResource Include="Database/Migrations/*.sql" />
     <Compile Remove="tests/**/*.cs" />
