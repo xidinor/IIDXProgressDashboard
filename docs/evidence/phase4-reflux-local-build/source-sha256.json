@@ -1,0 +1,130 @@
+[
+  {
+    "path": ".gitattributes",
+    "sha256": "45a7cbb7d9942ba7ffce0b20bc8dbe2d1196533bc6e4bd245871d77fb1eedfdc"
+  },
+  {
+    "path": ".gitignore",
+    "sha256": "ed1c8818202184b01df945376d934407d75cb84f0767157577044d819a6e0be3"
+  },
+  {
+    "path": "LICENSE",
+    "sha256": "3dc76e8057f53c386bcc94ffb52786d2c7448f0701c8f5e7d9532d49642da89b"
+  },
+  {
+    "path": "README.md",
+    "sha256": "975312f214d92d954c8f8e356635cac8e632a80ee92829d0865e09fcd8349ea2"
+  },
+  {
+    "path": "Reflux.sln",
+    "sha256": "b46d7293193bc4541a8e0385cf519410609ee695aa2e5e8e1db37adbb1d170c4"
+  },
+  {
+    "path": "Reflux/beginners.txt",
+    "sha256": "41402fc0ce5cc9104ab6ea0df0cf8259aaa85fd9bb11f9317fff34dc3f125d9d"
+  },
+  {
+    "path": "Reflux/Config.cs",
+    "sha256": "6e6de7303812297982f8a5e9075699a16e1b3bba4c04bc6a3cc06749875bb1c3"
+  },
+  {
+    "path": "Reflux/config.ini",
+    "sha256": "69ce61adb0644b804e63670cf2b057e406df73ccfad5164826eee9a31dee9976"
+  },
+  {
+    "path": "Reflux/customtypes.txt",
+    "sha256": "a94650e55b1a44a0b03a317429b66ce1c43316e6dc1dce5de95317dae8b927e5"
+  },
+  {
+    "path": "Reflux/docs/offset finding.txt",
+    "sha256": "cbaa9b9fb38d41f675c30499a7504f16f40681e150ba0a8455145fd8b8778bf2"
+  },
+  {
+    "path": "Reflux/docs/offset_digging.groff",
+    "sha256": "11c323e60688f83d6c92d8c6a5e355a7d143dffa5cabe09eee9a10594a5512c2"
+  },
+  {
+    "path": "Reflux/docs/out.pdf",
+    "sha256": "ff1de0a1d8dd2ac529aa9c1d82808ddd475c3def9c6fd0e33f5a39e9a43f8e07"
+  },
+  {
+    "path": "Reflux/encodingfixes.txt",
+    "sha256": "c542f3a714d519ce9db6216bcf03af04c3071ef4872f94a6c8b9fc073ccc23f7"
+  },
+  {
+    "path": "Reflux/Extensions.cs",
+    "sha256": "cac13b08d3b6ab6df0d550eb0137bea580b1e4c812afef998dc29812689e3b40"
+  },
+  {
+    "path": "Reflux/Judge.cs",
+    "sha256": "0f0fbfa70387f21658f9f4c6d788ff324a87566660823843fbd11950594be80d"
+  },
+  {
+    "path": "Reflux/Network.cs",
+    "sha256": "b39e6dc7fb23747532b234723e2b71c7ec08d75289e2536b2f15a14f5f28b792"
+  },
+  {
+    "path": "Reflux/Offsets.cs",
+    "sha256": "d610842cb853ab9a671c0564b42be25aaecc3842e80629fa3620b2a9ebf5c6f0"
+  },
+  {
+    "path": "Reflux/offsets.txt",
+    "sha256": "ec5c8a0a0f10ae2d0562f5a08b9be3ab942bdba5fb59424ec668b9ce390b0918"
+  },
+  {
+    "path": "Reflux/OffsetSearcher.cs",
+    "sha256": "fe7e572ebab01b094aa0cb9aa3b2f37f89142990dd97da42ca1fef48fef3d8a4"
+  },
+  {
+    "path": "Reflux/PlayData.cs",
+    "sha256": "ffad8be1bd035d27625a19fc053502746f480d915925f4f3d6656ee454a1b277"
+  },
+  {
+    "path": "Reflux/Program.cs",
+    "sha256": "6d7ea3ca6d7af9b6b04405b4f4a2c7755cf84302a35fe06f38dde55b9c6911fb"
+  },
+  {
+    "path": "Reflux/Properties/Resources.Designer.cs",
+    "sha256": "acdfece3fd75d7db1ca7ab3a395d468c1dd71fd7e5ea2a55af23380892b4adb0"
+  },
+  {
+    "path": "Reflux/Properties/Resources.resx",
+    "sha256": "3362289749a527adc18c5a29255cb4f4fb15689f15a6137df1a9871a47d9cb9e"
+  },
+  {
+    "path": "Reflux/Reflux.csproj",
+    "sha256": "28f5fc25c35c52867d7f5ce81aa106c1da24647c3f09f0d13267c9e65aed3461"
+  },
+  {
+    "path": "Reflux/Resources/icon.ico",
+    "sha256": "39d0838fceb319aed21b6714037cecb314828e849a7eaafd7a0e0a36665c16b9"
+  },
+  {
+    "path": "Reflux/ScoreMap.cs",
+    "sha256": "7d5a14613f7519dbdb1fe54452c58b4b27def43cd31159ad4d28ecc9a2e7e6a1"
+  },
+  {
+    "path": "Reflux/segment-display.js",
+    "sha256": "c8555a03727d9b1ecaee48cffbc3b4649fb25ba65fde0cdf24180f377699d97f"
+  },
+  {
+    "path": "Reflux/SegmentDisplay 16 units (browser source 375x34).html",
+    "sha256": "ae3e7144443e582571673873561b9e237464c4da37f70f72cf8242c3de0429cc"
+  },
+  {
+    "path": "Reflux/SegmentDisplay 9 units (browser source 200x34).html",
+    "sha256": "b2d1ad24b2bbf8473d9186ab479e7fcca80d7271e30859edcd60106f88078e9a"
+  },
+  {
+    "path": "Reflux/Settings.cs",
+    "sha256": "0f91fccc85d2d17447b91b54d65549db6e9c792cbf75b2ba93a88ddef1f8f592"
+  },
+  {
+    "path": "Reflux/Tracker.cs",
+    "sha256": "8c3e4c3e0d56b030230a6ff58d4afaa5cc51359cdd326e7187e2633e53bba81e"
+  },
+  {
+    "path": "Reflux/Utils.cs",
+    "sha256": "d86fc3916bf287d233ab2da10cb44a7294857b6bf20ebde4388cf1688ac39da1"
+  }
+]

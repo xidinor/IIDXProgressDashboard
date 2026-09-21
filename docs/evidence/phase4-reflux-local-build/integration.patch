@@ -1,0 +1,498 @@
+diff --git a/Reflux/Extensions.cs b/Reflux/Extensions.cs
+index 0f9737e..243d3db 100644
+--- a/Reflux/Extensions.cs
++++ b/Reflux/Extensions.cs
+@@ -27,5 +27,9 @@ namespace Reflux
+         {
+             return longs.SelectMany(i => BitConverter.GetBytes(i)).ToArray();
+         }
++        public static byte[] ToBytesUnicode(this string str)
++        {
++            return Encoding.Unicode.GetBytes(str); // UTF-16LE
++        }
+     }
+ }
+diff --git a/Reflux/OffsetSearcher.cs b/Reflux/OffsetSearcher.cs
+index e5f0af2..4e9909a 100644
+--- a/Reflux/OffsetSearcher.cs
++++ b/Reflux/OffsetSearcher.cs
+@@ -15,7 +15,8 @@ namespace Reflux
+             Console.WriteLine("Starting offset search mode, press ENTER to continue");
+             Console.ReadLine();
+             OffsetsCollection newOffsets = new OffsetsCollection();
+-            newOffsets.SongList = FetchAndSearch(Offsets.SongList, "SongList", MergeByteRepresentations("5.1.1.".ToBytes()));
++            var songListPattern = Offsets.Song.IsWide ? "5.1.1.".ToBytesUnicode() : "5.1.1.".ToBytes();
++            newOffsets.SongList = FetchAndSearch(Offsets.SongList, "SongList", MergeByteRepresentations(songListPattern));
+             newOffsets.UnlockData = FetchAndSearch(Offsets.UnlockData, "UnlockData", MergeByteRepresentations(1000.ToBytes(), 1.ToBytes(), 462.ToBytes()));
+             newOffsets.DataMap = FetchAndSearch(Offsets.DataMap, "DataMap", MergeByteRepresentations(0x7FFF.ToBytes(), 0.ToBytes()), -3 * 8); // Back 3 steps in 8-byte address space
+ 
+diff --git a/Reflux/Offsets.cs b/Reflux/Offsets.cs
+index 331183b..2372b3a 100644
+--- a/Reflux/Offsets.cs
++++ b/Reflux/Offsets.cs
+@@ -5,6 +5,42 @@ using System.Text;
+ namespace Reflux
+ {
+ 
++    /// <summary>
++    /// Layout of a single song entry in the song list.
++    ///
++    /// The game has reshuffled this more than once (buffers widened, encoding changed), and each
++    /// time it did, parsing broke in a way no offset value could fix - the addresses were right,
++    /// the strides were not. Keeping the layout in offsets.txt means such a patch can be handled
++    /// by editing a text file instead of rebuilding.
++    ///
++    /// Defaults describe the current game (P2D:J:B:A:2026080500 and later). Every field is
++    /// optional in offsets.txt; omit it to use the default. To read an older build, override the
++    /// ones that differ - for example everything up to 2026-06-03 used:
++    ///   songBufferSize = 630 / songTitleSize = 80 / songArtistSize = 80 / songIdOffset = 4B0
++    ///   songStringEncoding = shift-jis
++    /// (sizes are hex, matching the rest of the file)
++    /// </summary>
++    public class SongLayout
++    {
++        /// <summary>Stride between song entries</summary>
++        public int BufferSize { get; set; } = 0x730;
++        /// <summary>Primary title buffer, at entry start</summary>
++        public int TitleSize { get; set; } = 0x100;
++        /// <summary>LED ticker text. Always Shift-JIS regardless of StringEncoding</summary>
++        public int TickerSize { get; set; } = 0x40;
++        public int GenreSize { get; set; } = 0x80;
++        public int ArtistSize { get; set; } = 0x100;
++        /// <summary>Offset of the song id within the entry</summary>
++        public int IdOffset { get; set; } = 0x5B0;
++        /// <summary>"utf-16le" or "shift-jis" - applies to title, genre and artist</summary>
++        public string StringEncoding { get; set; } = "utf-16le";
++
++        public bool IsWide
++        {
++            get { return StringEncoding.Equals("utf-16le", StringComparison.OrdinalIgnoreCase); }
++        }
++    }
++
+     public class OffsetsCollection
+     {
+         public long SongList { get; set; }
+@@ -14,6 +50,7 @@ namespace Reflux
+         public long PlaySettings { get; set; }
+         public long UnlockData { get; set; }
+         public long CurrentSong { get; set; }
++        public SongLayout Song { get; set; } = new SongLayout();
+     }
+     static class Offsets
+     {
+@@ -50,6 +87,10 @@ namespace Reflux
+         /// Location where information of currently playing song and difficulty is found
+         /// </summary>
+         public static long CurrentSong { get { return offsets.CurrentSong; } }
++        /// <summary>
++        /// Layout of a song entry. Optional overrides in offsets.txt, defaults for the current game
++        /// </summary>
++        public static SongLayout Song { get { return offsets.Song; } }
+ 
+         public static void LoadOffsets()
+         {
+@@ -65,18 +106,28 @@ namespace Reflux
+ 
+                 var line = lines[i];
+                 var sections = line.Split('=');
+-                sections[0] = sections[0].Trim();
+-                sections[1] = sections[1].Trim();
+-                var offset = Convert.ToInt64(sections[1], 16);
+-                switch (sections[0].ToLower())
++                if (sections.Length < 2) { continue; }
++                var key = sections[0].Trim().ToLower();
++                var value = sections[1].Trim();
++                /* Not every key is an address - songStringEncoding is a name - so the hex
++                 * conversion happens per case rather than up front. */
++                switch (key)
+                 {
+-                    case "judgedata": newoffsets.JudgeData = offset; break;
+-                    case "playdata": newoffsets.PlayData = offset; break;
+-                    case "songlist": newoffsets.SongList = offset; break;
+-                    case "unlockdata": newoffsets.UnlockData = offset; break;
+-                    case "datamap": newoffsets.DataMap = offset; break;
+-                    case "playsettings": newoffsets.PlaySettings = offset; break;
+-                    case "currentsong": newoffsets.CurrentSong = offset; break;
++                    case "judgedata": newoffsets.JudgeData = Convert.ToInt64(value, 16); break;
++                    case "playdata": newoffsets.PlayData = Convert.ToInt64(value, 16); break;
++                    case "songlist": newoffsets.SongList = Convert.ToInt64(value, 16); break;
++                    case "unlockdata": newoffsets.UnlockData = Convert.ToInt64(value, 16); break;
++                    case "datamap": newoffsets.DataMap = Convert.ToInt64(value, 16); break;
++                    case "playsettings": newoffsets.PlaySettings = Convert.ToInt64(value, 16); break;
++                    case "currentsong": newoffsets.CurrentSong = Convert.ToInt64(value, 16); break;
++                    /* Song entry layout - all optional, see SongLayout for defaults */
++                    case "songbuffersize": newoffsets.Song.BufferSize = Convert.ToInt32(value, 16); break;
++                    case "songtitlesize": newoffsets.Song.TitleSize = Convert.ToInt32(value, 16); break;
++                    case "songtickersize": newoffsets.Song.TickerSize = Convert.ToInt32(value, 16); break;
++                    case "songgenresize": newoffsets.Song.GenreSize = Convert.ToInt32(value, 16); break;
++                    case "songartistsize": newoffsets.Song.ArtistSize = Convert.ToInt32(value, 16); break;
++                    case "songidoffset": newoffsets.Song.IdOffset = Convert.ToInt32(value, 16); break;
++                    case "songstringencoding": newoffsets.Song.StringEncoding = value; break;
+                 }
+             }
+             Apply(Version, newoffsets);
+@@ -101,6 +152,11 @@ namespace Reflux
+             }
+             File.Move("offsets.txt", $"archive/{Version.Replace(':', '_')}.txt", true);
+ 
++            /* Offset search only rediscovers addresses, not the entry layout. Carry the loaded
++             * layout over, otherwise any override in offsets.txt is silently dropped here and the
++             * parser reverts to defaults on the next run. */
++            if (offsets != null && offsets.Song != null) { newOffsets.Song = offsets.Song; }
++
+             Apply(version, newOffsets);
+ 
+             StringBuilder sb = new StringBuilder();
+@@ -113,6 +169,20 @@ namespace Reflux
+             sb.AppendLine($"judgeData = 0x{newOffsets.JudgeData:X}");
+             sb.AppendLine($"datamap = 0x{newOffsets.DataMap:X}");
+ 
++            /* Only write layout keys that differ from the defaults, to keep offsets.txt readable */
++            var def = new SongLayout();
++            var song = newOffsets.Song;
++            if (song.BufferSize != def.BufferSize) { sb.AppendLine($"songBufferSize = 0x{song.BufferSize:X}"); }
++            if (song.TitleSize != def.TitleSize) { sb.AppendLine($"songTitleSize = 0x{song.TitleSize:X}"); }
++            if (song.TickerSize != def.TickerSize) { sb.AppendLine($"songTickerSize = 0x{song.TickerSize:X}"); }
++            if (song.GenreSize != def.GenreSize) { sb.AppendLine($"songGenreSize = 0x{song.GenreSize:X}"); }
++            if (song.ArtistSize != def.ArtistSize) { sb.AppendLine($"songArtistSize = 0x{song.ArtistSize:X}"); }
++            if (song.IdOffset != def.IdOffset) { sb.AppendLine($"songIdOffset = 0x{song.IdOffset:X}"); }
++            if (!song.StringEncoding.Equals(def.StringEncoding, StringComparison.OrdinalIgnoreCase))
++            {
++                sb.AppendLine($"songStringEncoding = {song.StringEncoding}");
++            }
++
+             File.WriteAllText("offsets.txt", sb.ToString());
+ 
+         }
+diff --git a/Reflux/Program.cs b/Reflux/Program.cs
+index 4ddbf9f..dc1e6ec 100644
+--- a/Reflux/Program.cs
++++ b/Reflux/Program.cs
+@@ -332,7 +332,7 @@ namespace Reflux
+                             Console.WriteLine($"STATUS:{(newstate != GameState.playing ? " NOT" : "")} PLAYING");
+                             if (newstate == GameState.resultScreen)
+                             {
+-                                Thread.Sleep(1000); /* Sleep to avoid race condition */
++                                Thread.Sleep(2000); /* Sleep to avoid race condition */
+                                 var latestData = new PlayData();
+                                 latestData.Fetch();
+ 
+diff --git a/Reflux/Reflux.csproj b/Reflux/Reflux.csproj
+index 3cb0297..c1d99c4 100644
+--- a/Reflux/Reflux.csproj
++++ b/Reflux/Reflux.csproj
+@@ -3,7 +3,7 @@
+   <PropertyGroup>
+     <OutputType>Exe</OutputType>
+     <TargetFramework>netcoreapp3.1</TargetFramework>
+-    <Version>1.16.5</Version>
++    <Version>1.17.0</Version>
+ 	<ApplicationIcon>resources/icon.ico</ApplicationIcon>
+     <OutputPath>reflux build</OutputPath>
+ 	<PublishSingleFile>true</PublishSingleFile>
+diff --git a/Reflux/Utils.cs b/Reflux/Utils.cs
+index 62c365c..19986b1 100644
+--- a/Reflux/Utils.cs
++++ b/Reflux/Utils.cs
+@@ -109,7 +109,7 @@ namespace Reflux
+         public static IntPtr handle;
+         public static long playMarkerAddress = 0;
+         public static bool playMarkerAvailable = false;
+-        readonly static int songBufferSize = 0x630;
++        /* Song entry layout lives in Offsets.Song (overridable from offsets.txt) */
+         /// <summary>
+         /// DB for keeping track of unlocks and potential changes
+         /// </summary>
+@@ -306,7 +306,7 @@ namespace Reflux
+                     result.Add(songInfo.ID, songInfo);
+                 }
+ 
+-                current_position += songBufferSize;
++                current_position += Offsets.Song.BufferSize;
+ 
+             }
+             songDb = result;
+@@ -445,33 +445,50 @@ namespace Reflux
+         /// </summary>
+         /// <param name="position">Start position of song metadata</param>
+         /// <returns>SongInfo object containing all metadata</returns>
++        /// <summary>
++        /// Decode one string field of a song entry
++        /// </summary>
++        /// <param name="wide">UTF-16LE when true, Shift-JIS otherwise</param>
++        private static string DecodeSongString(byte[] buffer, int start, int size, bool wide)
++        {
++            var slice = buffer.Skip(start).Take(size).ToArray();
++            if (wide)
++            {
++                /* Zero bytes carry meaning here, so they cannot be filtered out the way the
++                 * Shift-JIS path does - trim the padding off the end instead. */
++                return Encoding.Unicode.GetString(slice).TrimEnd('\0').TrimEnd();
++            }
++            return Encoding.GetEncoding("Shift-JIS").GetString(slice.Where(x => x != 0).ToArray()).TrimEnd();
++        }
++
+         private static SongInfo FetchSongInfo(long position)
+         {
+             int bytesRead = 0;
++            var layout = Offsets.Song;
+             short slab = 64;
+-            short string_slab = 128; // Strings takes double the space now, except for the LED ticker text
+             short word = 4; /* Int32 */
+             int offset = 0;
+-            int idPosition = 1200;
++            int idPosition = layout.IdOffset;
+ 
+-            byte[] buffer = new byte[songBufferSize];
++            byte[] buffer = new byte[layout.BufferSize];
+ 
+             ReadProcessMemory((int)handle, position, buffer, buffer.Length, ref bytesRead);
+ 
+-            var title1 = Encoding.GetEncoding("Shift-JIS").GetString(buffer.Take(string_slab).Where(x => x != 0).ToArray()).TrimEnd();
+-            offset += string_slab;
++            var title1 = DecodeSongString(buffer, 0, layout.TitleSize, layout.IsWide);
++            offset += layout.TitleSize;
+ 
+             if (Utils.BytesToInt32(buffer.Take(slab).ToArray(), 0) == 0)
+             {
+                 return new SongInfo();
+             }
+ 
+-            var title2 = Encoding.GetEncoding("Shift-JIS").GetString(buffer.Skip(offset).Take(slab).Where(x => x != 0).ToArray()).TrimEnd();
+-            offset += slab;
+-            var genre = Encoding.GetEncoding("Shift-JIS").GetString(buffer.Skip(offset).Take(string_slab).Where(x => x != 0).ToArray()).TrimEnd();
+-            offset += string_slab;
+-            var artist = Encoding.GetEncoding("Shift-JIS").GetString(buffer.Skip(offset).Take(string_slab).Where(x => x != 0).ToArray()).TrimEnd();
+-            offset += string_slab;
++            /* The LED ticker text stayed Shift-JIS even when the other strings went wide */
++            var title2 = DecodeSongString(buffer, offset, layout.TickerSize, false);
++            offset += layout.TickerSize;
++            var genre = DecodeSongString(buffer, offset, layout.GenreSize, layout.IsWide);
++            offset += layout.GenreSize;
++            var artist = DecodeSongString(buffer, offset, layout.ArtistSize, layout.IsWide);
++            offset += layout.ArtistSize;
+ 
+             var folderBytes = buffer.Skip(offset).Skip(24).Take(1).ToList();
+             var folder = BitConverter.ToInt32(new byte[] { folderBytes[0], 0, 0, 0 });
+diff --git a/Reflux/customtypes.txt b/Reflux/customtypes.txt
+index b3463e3..7dfc6ec 100644
+--- a/Reflux/customtypes.txt
++++ b/Reflux/customtypes.txt
+@@ -1,4 +1,4 @@
+-﻿20260312
++﻿20260805
+ 04006,TRI3
+ 08023,TRI3
+ 13010,TRI3
+@@ -712,6 +712,7 @@
+ 28091,BV1
+ 28092,BV2
+ 28095,BV1
++28096,PC2
+ 28098,BPL1
+ 28100,UM1
+ 28101,BV2
+@@ -873,6 +874,7 @@
+ 30098,SV2
+ 30099,PC1
+ 30100,RES1
++30107,PC2
+ 30111,RES2
+ 31000,EPO1
+ 31001,EPO2
+@@ -937,6 +939,8 @@
+ 31079,EPO1
+ 31080,EPO1
+ 31081,EPO1
++31083,PC2
++31084,4TH1
+ 31086,BPL2
+ 31087,BPL2
+ 31088,BPL2
+@@ -950,42 +954,95 @@
+ 31111,PC1
+ 32000,PC1
+ 32001,PC1
++32002,PC2
++32003,PC2
+ 32004,PC1
+ 32005,PC1
++32007,PC2
++32008,PC2
+ 32009,PC1
++32010,PC2
+ 32011,PC1
+ 32012,PC1
++32013,PC2
++32014,PC2
++32015,PC2
+ 32017,PC1
++32020,PC2
++32021,4TH1
+ 32023,PC1
+ 32024,PC1
+ 32025,PC1
+ 32026,PC1
+ 32027,PC1
+ 32028,PC1
++32029,PC2
++32030,PC2
+ 32031,PC1
++32032,PC2
+ 32033,PC1
++32034,PC2
+ 32035,PC1
++32038,PC2
++32039,PC2
+ 32040,PC1
++32041,PC2
++32042,PC2
+ 32043,PC1
++32044,PC2
+ 32045,PC1
++32046,PC2
++32047,PC2
++32048,PC2
++32049,PC2
+ 32050,PC1
++32051,PC2
+ 32052,PC1
+ 32053,PC1
++32054,PC2
+ 32056,PC1
+ 32058,PC1
+ 32059,PC1
++32061,PC2
+ 32062,PC1
++32064,PC2
++32065,PC2
+ 32066,PC1
++32067,PC2
+ 32068,PC1
++32069,PC2
+ 32070,PC1
++32071,PC2
+ 32072,PC1
++32073,PC2
+ 32074,PC1
+ 32075,PC1
+ 32076,PC1
+ 32077,PC1
++32094,PC2
++32095,PC2
++32099,PC2
++32100,PC2
++32108,PC2
++32109,PC2
+ 33015,PC1
+ 33017,PC1
+ 33075,PC1
++33087,BPL3
++33088,BPL3
++33089,BPL3
++33090,BPL3
++33091,BPL3
++33092,BPL3
++33093,BPL3
++33094,BPL3
++33115,BPL3
++33116,BPL3
++33117,BPL3
++33118,BPL3
++33119,BPL3
++33120,BPL3
++33121,BPL3
+ 80001,3200DJP
+ 80004,PNM1
+ 80005,PNM1
+@@ -1076,3 +1133,11 @@
+ 80105,PC1
+ 80106,PC1
+ 80107,PC1
++80108,4TH1
++80109,4TH1
++80110,4TH1
++80111,4TH1
++80112,4TH1
++80113,4TH1
++80114,4TH1
++80115,4TH1
+diff --git a/Reflux/encodingfixes.txt b/Reflux/encodingfixes.txt
+index a077846..0437575 100644
+--- a/Reflux/encodingfixes.txt
++++ b/Reflux/encodingfixes.txt
+@@ -1,50 +1,13 @@
+-20260321
+-ACT?	ACTØ
+-Amor De Ver?o	Amor De Verão
+-BAHAM?T CORE	BAHAMŪT CORE
+-?bertreffen	Übertreffen
+-CANVAS feat. Quim?r & BEMANI Sound Team "L.E.D.-G"	CANVAS feat. Quimär & BEMANI Sound Team "L.E.D.-G"
+-CANVAS feat. Quim?r	CANVAS feat. Quimär
++20260805
+ Close the World feat. a☆ru	Close the World feat.a☆ru
+-Dans la nuit de l'?ternit?	Dans la nuit de l'éternité
+-D? D? MOUSE	DÉ DÉ MOUSE
+ DEATH　DISCO	DEATH DISCO
+-Double??Loving Heart	Double♡♡Loving Heart
+ e-motion 2003  -romantic extra-	e-motion 2003 -romantic extra-
+ fffff	ƒƒƒƒƒ
+-Geirsk?gul	Geirskögul
+-Ignis†Ir?	Ignis†Iræ
+ Light and Cyber…	Light and Cyber･･･
+-LOVE?CORE	LOVE♡CORE
+-Love?km	Love♡km
+-LOVE?SHINE	LOVE♡SHINE
+-?LOVE? シュガ→?	♥LOVE² シュガ→♥
+-Marguerite du Pr?	Marguerite du Pré
+-M?ch? M?nky	Mächö Mönky
+-OUVERT?RE	OUVERTÜRE
+-POL?AMAИIA	POLꞰAMAИIA
+-Pr?ludium	Präludium
+-P?rvat?	Pārvatī
+-Raison d'?tre～交差する宿命～	Raison d'être～交差する宿命～
+-Raspberry?Heart(English version)	Raspberry♡Heart(English version)
+-Raspberry Potion (feat.あれたん? & ぎゃるのしん☆)	Raspberry Potion (feat.あれたん♡ & ぎゃるのしん☆)
+-Sweet Sweet?Magic	Sweet Sweet♡Magic
+-?THER	ÆTHER
+-?u Legends	Ōu Legends
+-u?n	uən
+-V?ID	VØID
+-?Viva!	¡Viva!
+-オンセン?ヒーロー	オンセン♨ヒーロー
+-キャトられ?恋はモ～モク	キャトられ♥恋はモ～モク
+-ギュ～っとしたい?Prim	ギュ～っとしたい♥Prim
++The Sealer 〜ア・ミリアとミリアの民〜	The Sealer ～ア・ミリアとミリアの民～
+ ギョギョっと人魚 爆婚ブライダル	ギョギョっと人魚♨爆婚ブライダル
+-ジオメトリック?ティーパーティー	ジオメトリック∮ティーパーティー
+ ピアノ協奏曲第１番”蠍火”	ピアノ協奏曲第1番"蠍火"
+ フェティッシュペイパー　～　脇の汗回転ガール　～	フェティッシュペイパー ～ 脇の汗回転ガール ～
+ 共犯へヴンズコード	共犯ヘヴンズコード
+-?影	焱影
+-旋律のドグマ～Mis?rables～	旋律のドグマ～Misérables～
+ 海の底からマーメイド Prim by ARM×狐夢想	海の底からマーメイド♨Prim by ARM×狐夢想
+-表裏一体！？怪盗いいんちょの悩み?	表裏一体！？怪盗いいんちょの悩み♥
+-超!!遠距離らぶ?メ～ル	超!!遠距離らぶ♡メ～ル
+ 野球の遊び方　そしてその歴史　～決定版～	野球の遊び方 そしてその歴史 ～決定版～
+diff --git a/Reflux/offsets.txt b/Reflux/offsets.txt
+index 66cb787..c91a2ff 100644
+--- a/Reflux/offsets.txt
++++ b/Reflux/offsets.txt
+@@ -1,8 +1,8 @@
+-P2D:J:B:A:2026042200
+-songList = 0x1431CD810
+-unlockdata = 0x142901980
+-playSettings = 0x1425D2134
+-playData = 0x1425D2404
+-currentsong = 0x14287F370
+-judgeData = 0x14287F18C
+-datamap = 0x1435B3AF8
++P2D:J:B:A:2026080500
++songList = 0x1431D4870
++unlockdata = 0x1429089E0
++playSettings = 0x1425D9154
++playData = 0x1425D9404
++currentsong = 0x142886370
++judgeData = 0x14288618C
++datamap = 0x1435BAB88
