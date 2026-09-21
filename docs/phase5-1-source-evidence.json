@@ -1,0 +1,292 @@
+{
+  "observedDate": "2026-09-21",
+  "http": [
+    {
+      "name": "wiki-11-normal.html",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/22.html",
+      "startedUtc": "2026-09-21T01:52:50.5912027Z",
+      "endedUtc": "2026-09-21T01:52:50.7577393Z",
+      "status": 403,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": "",
+      "lastModified": "",
+      "bytes": 5626,
+      "sha256": "805E3A7EA3B8EE7F2DF48FA6E6E6DB5A99B09C5147043BD469B2F6A60FEA0F96"
+    },
+    {
+      "name": "wiki-11-hard.html",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/21.html",
+      "startedUtc": "2026-09-21T01:52:50.7980798Z",
+      "endedUtc": "2026-09-21T01:52:50.8358603Z",
+      "status": 403,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": "",
+      "lastModified": "",
+      "bytes": 5626,
+      "sha256": "5F822535E9E4B60A9BE545F9F5B432591ABD84D4E97BAE59B1B9FB3BBE042C96"
+    },
+    {
+      "name": "wiki-12-normal.html",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/19.html",
+      "startedUtc": "2026-09-21T01:52:50.8704839Z",
+      "endedUtc": "2026-09-21T01:52:50.9066701Z",
+      "status": 403,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": "",
+      "lastModified": "",
+      "bytes": 5626,
+      "sha256": "A4F1EDD241962F266FD3FE9997B0AB0EEA6EE3430A1E7C4B4FE77632B047B781"
+    },
+    {
+      "name": "wiki-12-hard.html",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/18.html",
+      "startedUtc": "2026-09-21T01:52:50.9433080Z",
+      "endedUtc": "2026-09-21T01:52:50.9855218Z",
+      "status": 403,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": "",
+      "lastModified": "",
+      "bytes": 5626,
+      "sha256": "D141E314E127AE2461796761CEFD71EBE4DA44112540210183F6D8C53331B9D9"
+    },
+    {
+      "name": "checker-11-normal.html",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/table/11_normal",
+      "startedUtc": "2026-09-21T01:52:51.0186771Z",
+      "endedUtc": "2026-09-21T01:52:51.3159180Z",
+      "status": 200,
+      "contentType": "text/html",
+      "etag": "W/\"12122e4eea1ef1702a11a0c172334104\"",
+      "lastModified": "Thu, 25 Sep 2025 11:37:37 GMT",
+      "bytes": 1011294,
+      "sha256": "847D6E2E14F11DD4DD99B4CE271D35062EE12DC9668AF82A8958870DE5A86304"
+    },
+    {
+      "name": "checker-11-hard.html",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/table/11_hard",
+      "startedUtc": "2026-09-21T01:52:51.4661398Z",
+      "endedUtc": "2026-09-21T01:52:51.6318926Z",
+      "status": 200,
+      "contentType": "text/html",
+      "etag": "W/\"9b51d69c780c19df7c3585c51475eae4\"",
+      "lastModified": "Thu, 25 Sep 2025 11:37:37 GMT",
+      "bytes": 1011243,
+      "sha256": "89FC7C4867D17EBC65414A7CD8BA48B1C6150DAEEC2F985805914CC8AC6D5179"
+    },
+    {
+      "name": "checker-12-normal.html",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/table/12_normal",
+      "startedUtc": "2026-09-21T01:52:51.8039918Z",
+      "endedUtc": "2026-09-21T01:52:51.9897576Z",
+      "status": 200,
+      "contentType": "text/html",
+      "etag": "W/\"14b837ca9986707cb53a61e8da210aa8\"",
+      "lastModified": "Thu, 25 Sep 2025 11:37:37 GMT",
+      "bytes": 1002805,
+      "sha256": "C02440E99A16295E32465E12BAA06E541D089E2412386C8F196E1C83E1622B14"
+    },
+    {
+      "name": "checker-12-hard.html",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/table/12_hard",
+      "startedUtc": "2026-09-21T01:52:52.1712670Z",
+      "endedUtc": "2026-09-21T01:52:52.3472043Z",
+      "status": 200,
+      "contentType": "text/html",
+      "etag": "W/\"7f7e77f2250ad8b3ef327efef84724e1\"",
+      "lastModified": "Thu, 25 Sep 2025 11:37:37 GMT",
+      "bytes": 1002745,
+      "sha256": "24BC4EA867D59BA474F4F45C3A8DF82B1C0A6CE897FB7DBD4FF8E4C0CAD0D12A"
+    },
+    {
+      "name": "data-pages-tree.json",
+      "url": "https://api.github.com/repos/chinimuruhi/IIDX-Data-Table/git/trees/gh-pages?recursive=1",
+      "startedUtc": "2026-09-21T01:52:52.4872201Z",
+      "endedUtc": "2026-09-21T01:52:52.9210485Z",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "etag": "W/\"8d41e5e1365aa3b8e6d7e76aeebf75a652da7d0f701fd37a2e4df4dc2a4f25ca\"",
+      "lastModified": "Fri, 14 Aug 2026 03:09:35 GMT",
+      "bytes": 22014,
+      "sha256": "8D41E5E1365AA3B8E6D7E76AEEBF75A652DA7D0F701FD37A2E4DF4DC2A4F25CA"
+    },
+    {
+      "name": "sp12-origin.json",
+      "url": "https://iidx-sp12.github.io/songs.json",
+      "startedUtc": "2026-09-21T01:52:52.9382792Z",
+      "endedUtc": "2026-09-21T01:52:52.9927415Z",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "etag": "W/\"6a807efd-1fd3d\"",
+      "lastModified": "Sat, 15 Aug 2026 15:00:13 GMT",
+      "bytes": 130365,
+      "sha256": "0F1A8E89FCF1BDB5978DFEFE556ADE4991ED3A954C837508CB7E68A910C93402"
+    },
+    {
+      "name": "sp12-origin.html",
+      "url": "https://iidx-sp12.github.io/",
+      "startedUtc": "2026-09-21T01:52:53.0019338Z",
+      "endedUtc": "2026-09-21T01:52:53.0276044Z",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": "W/\"6a807efd-547\"",
+      "lastModified": "Sat, 15 Aug 2026 15:00:13 GMT",
+      "bytes": 1351,
+      "sha256": "2F79B5878CB64715F1ACB6B7E407926D0486AC8D178DB80D126291B95CE2DEF0"
+    },
+    {
+      "name": "wiki-robots.txt",
+      "url": "https://w.atwiki.jp/robots.txt",
+      "startedUtc": "2026-09-21T01:52:53.0386487Z",
+      "endedUtc": "2026-09-21T01:52:53.0796123Z",
+      "status": 200,
+      "contentType": "text/plain",
+      "etag": "W/\"ec57fad70dc522a5ac15cb65c60860e5\"",
+      "lastModified": "Wed, 19 Aug 2026 09:35:03 GMT",
+      "bytes": 822,
+      "sha256": "82AF7F40F155F8D82E52EA1C9A1E45E2CACDFDFE99BB8A981170EC9576ADE39D"
+    },
+    {
+      "name": "data-difficulty-sp11-songs_list.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/difficulty/sp11/songs_list.json",
+      "startedUtc": "2026-09-21T01:54:56.5170655Z",
+      "endedUtc": "2026-09-21T01:54:56.8240535Z",
+      "status": 200,
+      "bytes": 40823,
+      "sha256": "6C983441916AB52676DB515EF88746E0CC782D6A56972A20917AB79B1E25AC5C"
+    },
+    {
+      "name": "data-difficulty-sp11-difficulty.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/difficulty/sp11/difficulty.json",
+      "startedUtc": "2026-09-21T01:54:56.8389122Z",
+      "endedUtc": "2026-09-21T01:54:57.0814450Z",
+      "status": 200,
+      "bytes": 754,
+      "sha256": "2B4A6BC07EF6B665046B2F13065FC95AF5238E93CF23CDA32B2BE406FE98F737"
+    },
+    {
+      "name": "data-difficulty-sp12-songs_list.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/difficulty/sp12/songs_list.json",
+      "startedUtc": "2026-09-21T01:54:57.0899877Z",
+      "endedUtc": "2026-09-21T01:54:57.3546607Z",
+      "status": 200,
+      "bytes": 49568,
+      "sha256": "8CEB33DEC4DE27E69B5E714FB30FE02504ABD4FF03DBD7FA07CBBABFBE33C3BB"
+    },
+    {
+      "name": "data-difficulty-sp12-difficulty.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/difficulty/sp12/difficulty.json",
+      "startedUtc": "2026-09-21T01:54:57.3665766Z",
+      "endedUtc": "2026-09-21T01:54:57.5798663Z",
+      "status": 200,
+      "bytes": 938,
+      "sha256": "68F1D3A98ED3EC19ECC4780D2D6B34F8B948B83430AFCEB5AB4E83634999E24D"
+    },
+    {
+      "name": "data-difficulty-sp12-last_modified.txt",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/difficulty/sp12/last_modified.txt",
+      "startedUtc": "2026-09-21T01:54:57.5868418Z",
+      "endedUtc": "2026-09-21T01:54:57.8078274Z",
+      "status": 200,
+      "bytes": 29,
+      "sha256": "2D1FAB16551E8683B8323A4CCC5556D5FA961901646A5A3CABCAC9D6CC80DF83"
+    },
+    {
+      "name": "data-textage-title.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/textage/title.json",
+      "startedUtc": "2026-09-21T01:54:57.8129873Z",
+      "endedUtc": "2026-09-21T01:54:58.0416950Z",
+      "status": 200,
+      "bytes": 77842,
+      "sha256": "48A4DD79ED7E73007DCCB1F97CC1E10E4BEF779F9249F9DB81A32A49E55D30BA"
+    },
+    {
+      "name": "data-textage-textage-tag.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/textage/textage-tag.json",
+      "startedUtc": "2026-09-21T01:54:58.0514771Z",
+      "endedUtc": "2026-09-21T01:54:58.2688845Z",
+      "status": 200,
+      "bytes": 54049,
+      "sha256": "35888A9BD9305DC81A96656804771F86A2A771D1EC27E095F4815ABB786F8A5A"
+    },
+    {
+      "name": "data-textage-chart-info.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/textage/chart-info.json",
+      "startedUtc": "2026-09-21T01:54:58.2753387Z",
+      "endedUtc": "2026-09-21T01:54:58.5656302Z",
+      "status": 200,
+      "bytes": 858853,
+      "sha256": "2BB2EC666B684996C6E515E1076E2F6988C26C4EE6456169C8F31267B71610F7"
+    },
+    {
+      "name": "data-konami-song_to_label.json",
+      "url": "https://raw.githubusercontent.com/chinimuruhi/IIDX-Data-Table/d7758884eb38799009607f7ed0db792cce20eb7d/konami/song_to_label.json",
+      "startedUtc": "2026-09-21T01:54:58.5753645Z",
+      "endedUtc": "2026-09-21T01:54:58.8290548Z",
+      "status": 200,
+      "bytes": 103882,
+      "sha256": "7F66044E368C8DE4807A09A4F82E27C559928E480AB9ADB9D694EB205D858130"
+    },
+    {
+      "name": "695-4568df259c13997f.js",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/_next/static/chunks/695-4568df259c13997f.js",
+      "sha256": "EF1264C116550282586F01A8BBCEBFC175491378903700724456824B8F6420C4"
+    },
+    {
+      "name": "373-44e073307932710c.js",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/_next/static/chunks/373-44e073307932710c.js",
+      "sha256": "1366BBA307ABB03DAC6B5037C6E8FCED906DC1C0E37175AF24BC158E32FF4985"
+    },
+    {
+      "name": "86-e5dcb7c16fac256b.js",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/_next/static/chunks/86-e5dcb7c16fac256b.js",
+      "sha256": "0A0B398652F251E59EAE7F2EA8B3C01C0FAB203EAB479B151BCAA88372D3856D"
+    },
+    {
+      "name": "[id]-5430c2023107a46e.js",
+      "url": "https://iidx-difficulty-table-checker.nomadblacky.dev/_next/static/chunks/pages/table/%5Bid%5D-5430c2023107a46e.js",
+      "sha256": null
+    }
+  ],
+  "dom": [
+    {
+      "key": "11-normal",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/22.html",
+      "capturedUtc": "2026-09-21T01:56:10.976Z",
+      "title": "☆11 (新ノマゲ難易度表) - beatmania IIDX SP☆11 難易度表保管所(仮) - atwiki（アットウィキ）",
+      "sections": 16,
+      "rows": 608,
+      "evidenceKind": "structured DOM rows (not HTTP bytes)",
+      "sha256": "16b374be290ebf30d6b0cc4609dd764e94862544de5e216ae2ee47287f69701a"
+    },
+    {
+      "key": "11-hard",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/21.html",
+      "capturedUtc": "2026-09-21T01:56:11.815Z",
+      "title": "☆11 (新ハード難易度表) - beatmania IIDX SP☆11 難易度表保管所(仮) - atwiki（アットウィキ）",
+      "sections": 16,
+      "rows": 608,
+      "evidenceKind": "structured DOM rows (not HTTP bytes)",
+      "sha256": "34178b69e7a01fc7af220fd25e801029d2602b10f9c2d814da2d1deb66b7e417"
+    },
+    {
+      "key": "12-normal",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/19.html",
+      "capturedUtc": "2026-09-21T01:56:12.745Z",
+      "title": "☆12 (ノマゲ難易度表) - beatmania IIDX SP☆11 難易度表保管所(仮) - atwiki（アットウィキ）",
+      "sections": 21,
+      "rows": 582,
+      "evidenceKind": "structured DOM rows (not HTTP bytes)",
+      "sha256": "dd6a339c7e3d4979c08ecbfd5a76222ddf6b90cbbeb37f4e360c74440d95e1c0"
+    },
+    {
+      "key": "12-hard",
+      "url": "https://w.atwiki.jp/bemani2sp11/pages/18.html",
+      "capturedUtc": "2026-09-21T01:56:13.717Z",
+      "title": "☆12 (ハード難易度表) - beatmania IIDX SP☆11 難易度表保管所(仮) - atwiki（アットウィキ）",
+      "sections": 20,
+      "rows": 582,
+      "evidenceKind": "structured DOM rows (not HTTP bytes)",
+      "sha256": "abaf79ec0da805ad260030f981d72eb3172193b1eff6db3a950e43f86ad2dc42"
+    }
+  ]
+}
