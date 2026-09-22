@@ -8,6 +8,7 @@
 ```mermaid
 flowchart TD
     HTTP[HTTP取得: 間隔・キャッシュ・上限付き再試行] --> P[Provider / Parser]
+    WV[☆11 WebView2: 固定URLからDOM採取] --> P
     HTML[利用者が指定したWiki保存HTML] --> P
     P --> V[完全性・表別ランク・曲行の検証]
     V --> M[原本再解析 / 共通TitleNormalizer・ChartResolver]
@@ -110,6 +111,6 @@ var retry = await updater.PrepareCurrentAsync(DifficultyTableKind.Sp12Normal,
 
 合成検証・実4表の件数と取得証跡・再実行方法は[5-6検証報告](phase5-6-integration-validation.md)と[機械可読証跡](phase5-6-evidence.json)に分離して記録する。実表全体・個人DB・原本・絶対パスはGitへ収録しない。
 
-5-6・5-7の対象は統合検証と全体解説。Issue #21の5-3追加項目「Wiki本番ブラウザー取得アダプター」は未完了のまま残す。保存HTMLでの成功は本番サイトの自動取得成功ではなく、Phase 5全体の完了条件はまだ満たさない。
+5-6・5-7の対象は統合検証と全体解説。その後、同日追補の[WebView2取得検証](phase5-3-webview2-acquisition.md)でIssue #21の5-3追加項目を実装・実証した。Wiki NORMAL/HARD各608行を製品のWebView2経路から取得し、既存ParserでCOMPLETE / VALID、診断0を確認した。Phase 5の取得・解析・照合・安全な更新APIと検証が揃った。通常UI接続やv1全体の完了を意味しない。
 
-[Issue #13](https://github.com/xidinor/IIDXProgressDashboard/issues/13)の現行HTTPマスター取得・通常プレイ可能範囲の確認、[Issue #16](https://github.com/xidinor/IIDXProgressDashboard/issues/16)の譜面修正と誤照合の区別も残る。今回の照合は配置済みTextage snapshotを正式Providerで解析した範囲に限定する。未解決の強制登録・alias自動追加は行わない。次工程は5-3残項目とPhase 6のUI・保持評価の表示方針。DDL変更、通常DB置換、個人履歴移行、配布完了は今回の対象外。
+[Issue #13](https://github.com/xidinor/IIDXProgressDashboard/issues/13)の現行HTTPマスター取得・通常プレイ可能範囲の確認、[Issue #16](https://github.com/xidinor/IIDXProgressDashboard/issues/16)の譜面修正と誤照合の区別も残る。今回の照合は配置済みTextage snapshotを正式Providerで解析した範囲に限定する。未解決の強制登録・alias自動追加は行わない。次工程はPhase 6のUI・保持評価の表示方針。DDL変更、通常DB置換、個人履歴移行、配布完了は今回の対象外。

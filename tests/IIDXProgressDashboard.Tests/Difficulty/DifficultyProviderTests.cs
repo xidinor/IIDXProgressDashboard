@@ -259,6 +259,69 @@ public sealed class DifficultyProviderTests
         Assert.DoesNotContain(path, Assert.Single(missing.Diagnostics).Detail);
     }
 
+    [Fact]
+    public async Task Browser_route_uses_existing_parser_cache_and_json_http_route()
+    {
+        // ☆11だけをブラウザーへ注入し、☆12の共有HTTP入力と既存キャッシュを維持する。
+        var handler = new StubHandler(HttpStatusCode.OK, "[" + JsonRow + "]", "application/json");
+        using var client = new HttpClient(handler);
+        int calls = 0;
+        var provider = new DifficultyTableProvider(client, (kind, token) =>
+        {
+            calls++;
+            return Task.FromResult(DifficultySource.FromUtf8(DifficultyTableDefinition.Get(kind).Url,
+                Encoding.UTF8.GetBytes(Wiki(kind)), "BROWSER_DOM") with { HttpStatus = 200 });
+        });
+        var results = await provider.FetchAllAsync();
+        Assert.All(results, r => Assert.True(r.IsValid));
+        Assert.Equal(2, calls);
+        Assert.Equal(1, handler.Count);
+        var again = await provider.FetchAsync(DifficultyTableKind.Sp11Normal);
+        Assert.Same(results[0].Source, again.Source);
+        Assert.Equal("BROWSER_DOM", again.Source!.InputKind);
+        Assert.Equal(2, calls);
+    }
+
+    [Theory]
+    [InlineData(403)]
+    [InlineData(429)]
+    [InlineData(200)]
+    public async Task Browser_challenge_is_preserved_not_cached_or_replaced(int status)
+    {
+        using var client = new HttpClient(new StubHandler(HttpStatusCode.OK, Wiki(DifficultyTableKind.Sp11Normal), "text/html"));
+        int calls = 0;
+        var provider = new DifficultyTableProvider(client, (kind, token) =>
+        {
+            calls++;
+            return Task.FromResult(DifficultySource.FromUtf8(DifficultyTableDefinition.Get(kind).Url,
+                Encoding.UTF8.GetBytes("<html><title>Just a moment...</title></html>"), "BROWSER_DOM") with { HttpStatus = status });
+        });
+        var first = await provider.FetchAsync(DifficultyTableKind.Sp11Normal);
+        Assert.False(first.IsValid);
+        Assert.NotNull(first.Source);
+        Assert.Empty(first.Rows);
+        Assert.False((await provider.FetchAsync(DifficultyTableKind.Sp11Normal)).IsValid);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task Browser_failure_and_cancellation_do_not_fall_back_to_http()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, Wiki(DifficultyTableKind.Sp11Normal), "text/html");
+        using var client = new HttpClient(handler);
+        var provider = new DifficultyTableProvider(client, (_, _) => throw new IOException("Runtime unavailable"));
+        Assert.Equal("FAILED", (await provider.FetchAsync(DifficultyTableKind.Sp11Normal)).AcquisitionStatus);
+        using var cancel = new CancellationTokenSource();
+        provider = new DifficultyTableProvider(client, (_, token) =>
+        {
+            cancel.Cancel();
+            token.ThrowIfCancellationRequested();
+            throw new Exception("unreachable");
+        });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => provider.FetchAsync(DifficultyTableKind.Sp11Normal, cancel.Token));
+        Assert.Equal(0, handler.Count);
+    }
+
     private sealed class StubHandler(HttpStatusCode status, string text, string contentType) : HttpMessageHandler
     {
         public int Count { get; private set; }

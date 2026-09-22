@@ -1,5 +1,7 @@
 # Phase 5-3: 難易度表の取得・解析Provider
 
+最新状況（2026-09-22追補）: [WebView2取得アダプター](phase5-3-webview2-acquisition.md)を追加し、実Wiki NORMAL/HARD各608行を取得・解析した。以下は各実装時点の記録であり、「本番ブラウザー取得は残課題」は追補により解消した。
+
 2026-09-22、[Issue #21 第3項](https://github.com/xidinor/IIDXProgressDashboard/issues/21)の実装。ブランチは `codex/phase5-3-difficulty-provider`。
 [入力契約](phase5-1-difficulty-source-contract.md)・[更新契約](phase5-2-difficulty-update-contract.md)に沿う4表のParserとHTTP取得を追加した。Wikiの本番ブラウザー取得は残課題であり、Phase 5-3全体の完了とはしない。照合・DB反映・通常UIは未実装。
 
