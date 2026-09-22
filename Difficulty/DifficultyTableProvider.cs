@@ -4,7 +4,8 @@ using System.Text;
 namespace IIDXProgressDashboard.Difficulty;
 
 /// <summary>テスト用HTTP境界を注入できる取得器。DBやFormへ依存しない。</summary>
-public sealed class DifficultyTableProvider(HttpClient client)
+public sealed class DifficultyTableProvider(HttpClient client,
+    Func<DifficultyTableKind, CancellationToken, Task<DifficultySource>>? wikiBrowserFetcher = null)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, DifficultySource> cache = new(StringComparer.Ordinal);
@@ -74,6 +75,14 @@ public sealed class DifficultyTableProvider(HttpClient client)
         {
             if (cache.TryGetValue(table.Url, out var saved) && DateTimeOffset.UtcNow - saved.CompletedAt < TimeSpan.FromMinutes(15))
                 source = saved;
+            else if (table.Level == 11 && wikiBrowserFetcher != null)
+            {
+                // 呼出側が選んだ取得経路を使う。失敗時にHTTPや保存HTMLへ切り替えない。
+                var delay = lastAttempt.AddSeconds(2) - DateTimeOffset.UtcNow;
+                if (delay > TimeSpan.Zero) await Task.Delay(delay, token).ConfigureAwait(false);
+                lastAttempt = DateTimeOffset.UtcNow;
+                source = await wikiBrowserFetcher(kind, token).ConfigureAwait(false);
+            }
             else
             {
                 // 手動連打でも最低2秒空ける。403/429は再試行せず、5xxのみ最大1回再試行する。
