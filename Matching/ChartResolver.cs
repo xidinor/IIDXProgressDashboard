@@ -1,5 +1,7 @@
 using IIDXProgressDashboard.Database;
 using Microsoft.Data.Sqlite;
+using IIDXProgressDashboard.Master;
+using System.Text.Json;
 
 namespace IIDXProgressDashboard.Matching;
 
@@ -30,6 +32,73 @@ public sealed class ChartResolver
     internal static ChartResolution Resolve(ChartResolutionRequest request, SqliteConnection connection, SqliteTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var primary = ResolvePrimary(request, connection, transaction);
+        // 外部IDの名前空間はaliasのSourceNameと独立。別サービスの同じ数値を混ぜない。
+        if (request.ExternalSongId is < 0 ||
+            (request.ExternalSongId.HasValue && string.IsNullOrWhiteSpace(request.ExternalSourceName)) ||
+            (request.ExternalSourceName is not null && (string.IsNullOrWhiteSpace(request.ExternalSourceName) ||
+                request.ExternalSourceName != request.ExternalSourceName.Trim())))
+            return new(request, null, [new("INVALID_EXTERNAL_ID", "外部IDは非負整数、直接IDには空白のない出典名が必要です。")],
+                primary.Candidates, primary.TitleEvidence);
+        if (primary.Issues.Any(i => i.Code.StartsWith("INVALID_", StringComparison.Ordinal))) return primary;
+
+        var source = request.ExternalSourceName ?? IidxDataTableProvider.SourceName;
+        var evidence = new List<ExternalSongEvidence>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = """
+                SELECT external_song_id,tag,title FROM external_song_ids
+                WHERE source_name=$source AND is_active=1
+                  AND (($id IS NOT NULL AND external_song_id=$id) OR ($id IS NULL AND normalized_title=$title))
+                ORDER BY external_song_id;
+                """;
+            query.Parameters.AddWithValue("$source", source);
+            query.Parameters.AddWithValue("$id", (object?)request.ExternalSongId ?? DBNull.Value);
+            query.Parameters.AddWithValue("$title", request.Title is null ? DBNull.Value : TitleNormalizer.Normalize(request.Title));
+            using var reader = query.ExecuteReader();
+            while (reader.Read()) evidence.Add(new(source, reader.GetInt64(0), reader.GetString(1), reader.GetString(2),
+                request.ExternalSongId.HasValue ? "DIRECT_ID" : "TITLE_DERIVED"));
+        }
+        // 補助経路がない場合、理由コードを含め従来の結果をそのまま返す。
+        if (evidence.Count == 0) return primary;
+        var tags = evidence.Select(e => e.Tag).Distinct(StringComparer.Ordinal).ToArray();
+        string? primaryTag = primary.ChartId.HasValue
+            ? primary.Candidates.Single(c => c.ChartId == primary.ChartId).Tag : null;
+        // 譜面不存在・level/notes矛盾でも曲の確定自体は済んでいる。譜面検証は弱めない。
+        if (primaryTag is null && primary.Issues.All(i => i.Code is "CHART_NOT_FOUND" or "LEVEL_MISMATCH" or "NOTES_MISMATCH"))
+            primaryTag = request.Tag ?? primary.TitleEvidence.Select(e => e.Tag).Distinct().SingleOrDefault();
+        if (tags.Length == 1 && primaryTag == tags[0])
+            return new(request, primary.ChartId, primary.Issues, primary.Candidates, primary.TitleEvidence, evidence);
+
+        var candidates = primary.Candidates.ToList();
+        TryParseChart(request.Difficulty, request.PlayStyle, out var style, out var difficulty);
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = """
+                SELECT c.chart_id,c.tag,s.title,c.play_style,c.difficulty,c.level,c.total_notes,s.is_active,c.is_active
+                FROM charts c JOIN songs s ON s.tag=c.tag WHERE c.play_style=$style AND c.difficulty=$difficulty ORDER BY c.chart_id;
+                """;
+            query.Parameters.AddWithValue("$style", style);
+            query.Parameters.AddWithValue("$difficulty", difficulty);
+            using var reader = query.ExecuteReader();
+            while (reader.Read())
+                if (tags.Contains(reader.GetString(1), StringComparer.Ordinal) && candidates.All(c => c.ChartId != reader.GetInt64(0)))
+                    candidates.Add(new(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
+                        reader.IsDBNull(5) ? null : reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                        reader.GetInt64(7) == 1, reader.GetInt64(8) == 1));
+        }
+        var code = tags.Length > 1 ? "EXTERNAL_ID_AMBIGUOUS" : primaryTag is null ? "EXTERNAL_ID_REVIEW_REQUIRED" : "EXTERNAL_ID_CONFLICT";
+        // Importer既存のreason_detail保存だけでも外部ID・候補・元経路の不一致理由を追える。
+        var detail = JsonSerializer.Serialize(new { message = "補助照合の候補を手動確認してください。自動確定しません。",
+            primaryTag, externalEvidence = evidence, primaryIssues = primary.Issues });
+        return new(request, null, new[] { new ChartResolutionIssue(code, detail) }.Concat(primary.Issues), candidates, primary.TitleEvidence, evidence);
+    }
+
+    private static ChartResolution ResolvePrimary(ChartResolutionRequest request, SqliteConnection connection, SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(request);
         var issues = new List<ChartResolutionIssue>();
         var candidates = new List<ChartCandidate>();
         var evidence = new List<SongTitleEvidence>();
@@ -48,7 +117,7 @@ public sealed class ChartResolver
             issues.Add(new("INVALID_SOURCE", "出典は空・前後空白を許可しません。"));
         if (request.Tag is not null && string.IsNullOrWhiteSpace(request.Tag))
             issues.Add(new("INVALID_TAG", "指定tagが空です。"));
-        if (request.Title is null && request.Tag is null)
+        if (request.Title is null && request.Tag is null && !request.ExternalSongId.HasValue)
             issues.Add(new("INVALID_TITLE", "タイトルまたはtagが必要です。"));
         if (request.Title is not null)
         {

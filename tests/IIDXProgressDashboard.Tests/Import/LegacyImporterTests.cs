@@ -266,6 +266,37 @@ public sealed class LegacyImporterTests : IDisposable
         Assert.Equal(integrated, LegacyInfinitasLogImporter.SelectPreferredSource(directory));
     }
 
+    [Theory]
+    [InlineData(true, false, false, null)]
+    [InlineData(true, true, false, null)]
+    [InlineData(false, true, false, "EXTERNAL_ID_REVIEW_REQUIRED")]
+    [InlineData(false, false, false, "SONG_NOT_FOUND")]
+    [InlineData(true, true, true, "EXTERNAL_ID_CONFLICT")]
+    public async Task ExternalMatchingUsesExistingPendingAndReimportFlow(bool primary, bool external, bool conflict, string? code)
+    {
+        Add(1);
+        if (!primary) Output("UPDATE songs SET title='別表記' WHERE tag='one';");
+        if (conflict) Output("INSERT INTO songs(tag,title,normalized_title) VALUES('two','Other','OTHER');");
+        if (external) Output("INSERT INTO external_song_ids(external_song_id,title,normalized_title,tag) VALUES(1,'合成曲','合成曲','" + (conflict ? "two" : "one") + "');");
+        var result = await Importer.ImportAsync(Input, sourceId);
+        Assert.Equal(code is null ? 1 : 0, result.Imported);
+        if (code is null) Assert.Equal(1, (await Importer.ImportAsync(Input, sourceId)).Duplicates);
+        else
+        {
+            Assert.Equal(code, Value("SELECT reason_code FROM unresolved_imports;"));
+            Assert.Equal("PENDING", Value("SELECT status FROM unresolved_imports;"));
+            Assert.Equal(0L, Count("play_history"));
+            if (external) Assert.Contains("IIDX_DATA_TABLE", (string)Value("SELECT reason_detail FROM unresolved_imports;")!);
+            if (!primary && external)
+            {
+                // 手動alias登録後も、元行キーと元データを変えず再照合する。
+                new SongAliasRepository(Database, Path.Combine(directory, "backups")).Register("one", "合成曲");
+                Assert.Equal(1, (await Importer.ImportAsync(Input, sourceId)).Imported);
+                Assert.Equal("RESOLVED", Value("SELECT status FROM unresolved_imports;"));
+            }
+        }
+    }
+
     private sealed class InlineProgress(Action<int> action) : IProgress<int>
     { public void Report(int value) => action(value); }
 
