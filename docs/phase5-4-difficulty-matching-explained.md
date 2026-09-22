@@ -1,5 +1,7 @@
 # Phase 5-4: 難易度表の譜面照合・未解決監査・現在世代の再照合
 
+> 2026-09-22追記: 以下は5-4完了時点の説明。[Phase 5-5](phase5-5-difficulty-update-explained.md)で更新サービス・UPSERT・監査run・所有状態・PENDING解決を同じtransactionへ接続した。実4表による5-6検証は引き続き未実施。
+
 2026-09-22、[Issue #21 第4項](https://github.com/xidinor/IIDXProgressDashboard/issues/21)の実装。
 [5-3 Provider](phase5-3-difficulty-provider-explained.md)と[5-2更新契約](phase5-2-difficulty-update-contract.md)の間に、共通Resolverへの接続と監査部品を追加した。
 公開APIで照合結果を取得できる。監査保存・再処理・PENDING解決は同一SQLiteトランザクションで利用する内部APIであり、5-5の更新サービスへの接続は残る。
