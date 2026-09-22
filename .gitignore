@@ -367,6 +367,8 @@ FodyWeavers.xsd
 *.db-wal
 *.db-shm
 *.db-journal
+*.pre-v*-*.bak
+*.pre-v*-*.bak.*
 *.pkl
 
 # CSV and TSV data files

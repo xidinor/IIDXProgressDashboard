@@ -15,21 +15,21 @@ database.Initialize();
 using var connection = database.OpenConnection();
 ```
 
-`Initialize()` は出力ディレクトリを作成し、空のDBにv1を適用する。`OpenConnection()` は既存ファイルだけを開き、接続ごとに外部キーを有効にする。返した接続は呼び出し側がDisposeする。
+`Initialize()` は出力ディレクトリを作成し、空のDBにv1・v2を順次適用する。既知のv1はバックアップ後にv2へ更新する。`OpenConnection()` は既存ファイルだけを開き、接続ごとに外部キーを有効にする。返した接続は呼び出し側がDisposeする。
 
 現在のForm1への接続はPhase 6で行う。この段階ではアプリ起動時に新DBを作成しない。通常利用の保存場所も後続のUI設計で決定する。
 
 ## Migrationと既存DBの保全
 
 - 即時トランザクション内でスキーマ検査・DDL・バージョン記録を行う。失敗時はDDLと履歴をまとめてロールバックする。作成済みの空ファイルやディレクトリは残る場合がある。
-- v1再実行時は、埋め込みDDLから作った基準スキーマと全テーブル・インデックス等のSQL定義を照合し、Migration履歴がversion 1の1行であることを確認する。
+- 再実行時は、埋め込みDDLから作った各版の基準スキーマと全テーブル・インデックス等のSQL定義を照合し、Migration履歴が1から現在版まで連続していることを確認する。
 - 旧DB、履歴欠落、将来バージョン、改変されたスキーマは変更せずエラーにする。SQL定義の厳密比較のため、外部ツールで同等のDDLへ書き換えたDBも拒否する。
-- Phase 1では非空DBのアップグレードは行わない。将来v2以降を追加する際は、適用前のSQLiteバックアップと、接続を閉じてバックアップから復旧する手順を先に実装・検証する。
+- 2026-09-23：`002_external_song_ids.sql`を追加。v1からの更新前にはSQLiteのバックアップAPIでWALを含む確定済み状態を保存し、失敗時は更新しない。既存songs・charts・履歴の行は変更しない。
 - `data/` は入力原本用。出力先に指定しない。Importer実装時には入力・出力の絶対パスの相違も検証する。
 
 Phase 2-3では `DatabaseBackup.Create` を追加し、マスター更新前にSQLiteバックアップと整合性検査を行う。
 保存先・保持方針・別パスへの復旧手順は[Phase 2-3解説](../docs/phase2-3-safe-master-update-explained.md)を参照。
-既存v1のスキーマとMigrationRunnerの動作は変更しておらず、将来の非空DBのMigrationへの自動接続は引き続き後続作業となる。
+Migration用のバックアップはDB隣接の`.pre-v2-<GUID>.bak`。版ごとの検査、未完了ファイルの区別、復旧は[外部IDのMigration解説](../docs/phase1-followup-external-song-ids-migration.md)を参照。
 
 ## 検証
 
