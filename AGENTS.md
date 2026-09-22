@@ -173,7 +173,7 @@ Pythonの本番実行依存を追加しない。最終配布は .NET 8 self-cont
 dotnet build IIDXProgressDashboard.sln
 ```
 
-Phase 1のDB基盤テストは以下で実行する。後続の照合・Importerについても、実装時に対応する自動テストを追加する。
+tests/IIDXProgressDashboard.Tests はリポジトリ全体の自動テストを含む。全件実行の要否は以下のテスト実行範囲に従う。
 
 ```powershell
 dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
@@ -181,7 +181,20 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 文書のみの変更ではビルド不要。実行していない検証を成功と報告しない。
 
-該当機能を変更する際の重点検証:
+### テスト実行範囲
+
+テストは変更影響に応じて必要な範囲を実行し、変更していない領域の全テストを機械的に毎回再実行しない。
+
+通常の局所的な変更では、変更した責務と直接の接合点に対応するテストを優先する。
+公開API、共通モデル、入力契約、DBスキーマ、共通Resolverなど影響範囲の広い変更では、直接影響する関連テストまで広げる。
+ソリューション全体のテストは、Phase完了判定、PR前の最終確認、共通基盤の変更、または影響範囲を安全に限定できない場合に実行する。
+直近の同一系統の作業で成功済みであり、今回その実装・契約・依存関係を変更していないテストは再実行を省略できる。その場合は、過去の検証結果を根拠として「未再実行」であることを報告する。
+新しい処理が既存のテスト済み処理へ入力を渡すだけの場合は、その接合点と入力契約を重点的に検証し、既存処理内部のテストを繰り返さない。
+過去のテストコードや検証記録についても、今回の変更影響を判断するために必要な範囲だけ参照し、変更されていない領域を機械的に再調査しない。
+
+ただし、テストを省略したことを「今回も成功した」と表現しない。実行済みの検証と、過去の成功結果を参照した検証を区別して報告する。
+
+### 該当機能を変更する際の重点検証
 
 - 新規DB作成、Migration再実行、外部キー、一意制約、失敗時の整合性
 - マスター更新後のchart_id・履歴維持、不完全取得時の既存データ保全
@@ -194,6 +207,8 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 - UTC/Local変換、無効日時、同時刻の複数履歴
 - NORMAL/HARDの別ランク、chart単位集計、未プレイ譜面の表示
 - 曲検索からの譜面選択、スコア/BP推移、欠損BP、履歴なしのUI動作
+
+### 配布フェーズの検証
 
 配布フェーズでは対象RIDを確認したうえでself-contained / single-file publishを行い、Pythonと旧2DBがない環境で起動・取込・表示を確認する。
 既存csprojの `System.Windows.Forms.DataVisualization` GAC参照は移植性の確認対象とし、publish成功だけで配布完了と判断しない。
