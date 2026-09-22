@@ -264,6 +264,32 @@ public sealed class DifficultyMatchingTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service.ResolveAsync(input, cancellation.Token));
     }
 
+    [Theory]
+    [InlineData(true, false, false, null)]
+    [InlineData(true, true, false, null)]
+    [InlineData(false, true, false, "EXTERNAL_ID_REVIEW_REQUIRED")]
+    [InlineData(false, false, false, "SONG_NOT_FOUND")]
+    [InlineData(true, true, true, "EXTERNAL_ID_CONFLICT")]
+    public void ExternalMatchingUsesSharedResolverAndExistingAudit(bool primary, bool external, bool conflict, string? code)
+    {
+        if (!primary) Execute("UPDATE songs SET title='Other' WHERE tag='one';");
+        if (external) Execute("INSERT INTO external_song_ids(external_song_id,title,normalized_title,tag) VALUES(1,'Song','SONG','" + (conflict ? "synth" : "one") + "');");
+        var result = Service.Resolve(Parse("[" + Row() + "]"));
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(code is null, row.ChartId.HasValue);
+        using var connection = Database.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var run = AddRun(connection, transaction, result);
+        DifficultyMatchingAudit.SaveDiagnostics(connection, transaction, run, null, result);
+        if (code is not null)
+        {
+            Assert.Equal(code, Scalar(connection, transaction, "SELECT reason_code FROM unresolved_imports;"));
+            Assert.Equal("PENDING", Scalar(connection, transaction, "SELECT status FROM unresolved_imports;"));
+            if (external) Assert.Contains("IIDX_DATA_TABLE", (string)Scalar(connection, transaction, "SELECT reason_detail FROM unresolved_imports;"));
+        }
+        else Assert.Equal(0L, Scalar(connection, transaction, "SELECT count(*) FROM unresolved_imports;"));
+    }
+
     private static long AddRun(SqliteConnection connection, SqliteTransaction transaction, DifficultyMatchingResult result,
         bool accepted = false, long? parent = null, long? generation = null)
     {

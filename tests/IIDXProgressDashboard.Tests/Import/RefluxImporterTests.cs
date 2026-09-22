@@ -265,5 +265,34 @@ public sealed class RefluxImporterTests : IDisposable
         Assert.Equal(1L, Sql("SELECT COUNT(*) FROM import_runs WHERE status='RUNNING'"));
         Assert.Equal(1, (await Importer.ImportAsync(Input, id)).Duplicates);
     }
+    [Theory]
+    [InlineData(true, false, false, null)]
+    [InlineData(true, true, false, null)]
+    [InlineData(false, true, false, "EXTERNAL_ID_REVIEW_REQUIRED")]
+    [InlineData(false, false, false, "SONG_NOT_FOUND")]
+    [InlineData(true, true, true, "EXTERNAL_ID_CONFLICT")]
+    public async Task ExternalMatchingUsesExistingPendingAndReimportFlow(bool primary, bool external, bool conflict, string? code)
+    {
+        Write(Row);
+        if (!primary) Sql("UPDATE songs SET title='別表記' WHERE tag='one';");
+        if (conflict) Sql("INSERT INTO songs(tag,title,normalized_title) VALUES('two','Other','OTHER');");
+        if (external) Sql("INSERT INTO external_song_ids(external_song_id,title,normalized_title,tag) VALUES(1,'合成曲','合成曲','" + (conflict ? "two" : "one") + "');");
+        var result = await Importer.ImportAsync(Input, id);
+        Assert.Equal(code is null ? 1 : 0, result.Imported);
+        if (code is null) Assert.Equal(1, (await Importer.ImportAsync(Input, id)).Duplicates);
+        else
+        {
+            Assert.Equal(code, Sql("SELECT reason_code FROM unresolved_imports;"));
+            Assert.Equal("PENDING", Sql("SELECT status FROM unresolved_imports;"));
+            Assert.Equal(0L, Sql("SELECT count(*) FROM play_history;"));
+            if (external) Assert.Contains("IIDX_DATA_TABLE", (string)Sql("SELECT reason_detail FROM unresolved_imports;")!);
+            if (!primary && external)
+            {
+                new SongAliasRepository(Database, Path.Combine(directory, "backups")).Register("one", "合成曲");
+                Assert.Equal(1, (await Importer.ImportAsync(Input, id)).Imported);
+                Assert.Equal("RESOLVED", Sql("SELECT status FROM unresolved_imports;"));
+            }
+        }
+    }
     public void Dispose() => Directory.Delete(directory, true);
 }

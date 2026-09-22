@@ -21,7 +21,8 @@ public sealed class DatabaseTests : IDisposable
         using var reopened = Database.OpenConnection();
         Assert.Equal(1L, Scalar(reopened, "PRAGMA foreign_keys;"));
         Assert.Equal(1L, Scalar(reopened, "SELECT COUNT(*) FROM schema_migrations WHERE version=1;"));
-        Assert.Equal(10L, Scalar(reopened, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table';"));
+        Assert.Equal(11L, Scalar(reopened, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table';"));
+        Assert.Equal(2L, Scalar(reopened, "SELECT COUNT(*) FROM schema_migrations;"));
         Assert.Equal(2L, Scalar(reopened, "SELECT COUNT(*) FROM play_history;"));
         Assert.Equal(1L, Scalar(reopened, "SELECT COUNT(*) FROM play_history WHERE miss_count IS NULL;"));
         Assert.Equal(1L, Scalar(reopened, "SELECT COUNT(*) FROM play_history WHERE miss_count=0;"));
@@ -91,12 +92,13 @@ public sealed class DatabaseTests : IDisposable
     }
 
     [Theory]
-    [InlineData("UPDATE schema_migrations SET version=99;")]
+    [InlineData("UPDATE schema_migrations SET version=99 WHERE version=2;")]
+    [InlineData("DELETE FROM schema_migrations WHERE version=1;")]
     [InlineData("DELETE FROM schema_migrations;")]
     [InlineData("DROP INDEX idx_play_history_bp;")]
     public void ModifiedSchemaOrMigrationHistoryIsRejected(string sql)
     {
-        // 正常なv1を作ってから履歴やインデックスを変更し、再初期化で黙って修復しないことを確認する。
+        // 正常な現行版を作ってから履歴やインデックスを変更し、黙って修復しないことを確認する。
         Database.Initialize();
         using (var connection = Database.OpenConnection()) Execute(connection, sql);
         var before = File.ReadAllBytes(Database.DatabasePath);
@@ -118,7 +120,96 @@ public sealed class DatabaseTests : IDisposable
         // 失敗原因を除去すると、同じ接続で初期化をやり直せることを確認する。
         Execute(connection, "DROP VIEW temp.songs;");
         new MigrationRunner().Run(connection);
-        Assert.Equal(1L, Scalar(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+        Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void VersionOneUpgradePreservesDataAndCreatesRestorableBackup(bool wal)
+    {
+        // 実際の旧DDLからv1を用意する。WAL内に残る確定済み履歴もバックアップ対象。
+        using var connection = CreateVersionOne();
+        if (wal) Execute(connection, "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;");
+        Seed(connection);
+        new MigrationRunner().Run(connection);
+        new MigrationRunner().Run(connection);
+        Assert.Equal(2L, Scalar(connection, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM play_history WHERE chart_id=1;"));
+        var backupPath = Assert.Single(Directory.GetFiles(directory, "*.bak"));
+        using var backup = new SqliteConnection($"Data Source={backupPath};Mode=ReadOnly;Pooling=False");
+        backup.Open();
+        Assert.Equal(1L, Scalar(backup, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(2L, Scalar(backup, "SELECT COUNT(*) FROM play_history;"));
+        Assert.Equal(0L, Scalar(backup, "SELECT COUNT(*) FROM sqlite_schema WHERE name='external_song_ids';"));
+        Assert.Equal("ok", Scalar(backup, "PRAGMA integrity_check;"));
+        Assert.Null(Scalar(connection, "PRAGMA foreign_key_check;"));
+    }
+
+    [Fact]
+    public void FailedUpgradeRollsBackAndRetainsBackup()
+    {
+        using var connection = CreateVersionOne();
+        Seed(connection);
+        // DDL後の版記録を意図的に失敗させ、作成したテーブルまで巻き戻す。
+        Execute(connection, "CREATE TEMP TRIGGER fail_version BEFORE INSERT ON main.schema_migrations BEGIN SELECT RAISE(ABORT,'test failure'); END;");
+        Assert.Throws<SqliteException>(() => new MigrationRunner().Run(connection));
+        Assert.Equal(1L, Scalar(connection, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(0L, Scalar(connection, "SELECT COUNT(*) FROM main.sqlite_schema WHERE name='external_song_ids';"));
+        Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM play_history;"));
+        Assert.Single(Directory.GetFiles(directory, "*.bak"));
+        Execute(connection, "DROP TRIGGER temp.fail_version;");
+        new MigrationRunner().Run(connection);
+        Assert.Equal(2L, Scalar(connection, "SELECT MAX(version) FROM schema_migrations;"));
+    }
+
+    [Theory]
+    [InlineData("DROP INDEX idx_play_history_bp;")]
+    [InlineData("UPDATE schema_migrations SET version=2;")]
+    public void InvalidVersionOneIsRejectedBeforeBackup(string change)
+    {
+        using var connection = CreateVersionOne();
+        Execute(connection, change);
+        Assert.Throws<InvalidOperationException>(() => new MigrationRunner().Run(connection));
+        Assert.Empty(Directory.GetFiles(directory, "*.bak"));
+        Assert.Equal(0L, Scalar(connection, "SELECT COUNT(*) FROM sqlite_schema WHERE name='external_song_ids';"));
+    }
+
+    [Fact]
+    public void ExternalIdentifiersHaveIndependentTitlesAndSourceScopedKeys()
+    {
+        Database.Initialize();
+        using var connection = Database.OpenConnection();
+        Execute(connection, """
+            INSERT INTO songs(tag,title,normalized_title) VALUES('anchor','Internal','INTERNAL');
+            INSERT INTO external_song_ids(external_song_id,title,normalized_title,tag)
+                VALUES(123,'External','EXTERNAL','anchor');
+            INSERT INTO external_song_ids(source_name,external_song_id,title,normalized_title,tag)
+                VALUES('OTHER',123,'Another','ANOTHER','anchor');
+            UPDATE songs SET tag='renamed' WHERE tag='anchor';
+            """);
+        Assert.Equal("IIDX_DATA_TABLE", Scalar(connection, "SELECT source_name FROM external_song_ids WHERE title='External';"));
+        Assert.Equal(2L, Scalar(connection, "SELECT COUNT(*) FROM external_song_ids WHERE tag='renamed' AND is_active=1 AND created_at IS NOT NULL AND updated_at IS NOT NULL;"));
+        Assert.Equal("Internal", Scalar(connection, "SELECT title FROM songs;"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "DELETE FROM songs;"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "UPDATE external_song_ids SET source_name='IIDX_DATA_TABLE';"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "UPDATE external_song_ids SET tag='missing';"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "UPDATE external_song_ids SET is_active=2;"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "UPDATE external_song_ids SET title=NULL;"));
+        Assert.Throws<SqliteException>(() => Execute(connection, "UPDATE external_song_ids SET external_song_id=NULL;"));
+    }
+
+    private SqliteConnection CreateVersionOne()
+    {
+        Directory.CreateDirectory(directory);
+        var connection = new SqliteConnection($"Data Source={Database.DatabasePath};Foreign Keys=True;Pooling=False");
+        connection.Open();
+        using var stream = typeof(MigrationRunner).Assembly.GetManifestResourceStream(
+            "IIDXProgressDashboard.Database.Migrations.001_initial.sql")!;
+        using var reader = new StreamReader(stream);
+        Execute(connection, reader.ReadToEnd());
+        Execute(connection, "INSERT INTO schema_migrations(version,description) VALUES(1,'Initial unified database schema');");
+        return connection;
     }
 
     [Fact]

@@ -170,6 +170,90 @@ public sealed class ChartResolverTests : IDisposable
         Assert.Equal(before, File.ReadAllBytes(path));
     }
 
+    [Theory]
+    [InlineData(true, false, null)]
+    [InlineData(true, true, null)]
+    [InlineData(false, true, "EXTERNAL_ID_REVIEW_REQUIRED")]
+    [InlineData(false, false, "SONG_NOT_FOUND")]
+    public void ExternalAndPrimaryCombinationFollowsDecisionTable(bool primary, bool external, string? code)
+    {
+        // タイトル由来の候補も共通Resolver内で照合する。Importer側のID生成は不要。
+        if (!primary) Execute("UPDATE songs SET title='Changed' WHERE tag='one';");
+        if (external) AddExternal(1, "A Song", "A SONG", "one");
+        var result = Resolver.Resolve(new("A Song", "SPA"));
+        Assert.Equal(code is null, result.IsResolved);
+        if (code is not null) Assert.Equal(code, result.Issues[0].Code);
+        if (external) Assert.Equal("TITLE_DERIVED", Assert.Single(result.ExternalEvidence).MatchKind);
+    }
+
+    [Fact]
+    public void ContradictionAmbiguityAndInvalidTagRequireManualReview()
+    {
+        AddExternal(1, "A Song", "A SONG", "two");
+        var conflict = Resolver.Resolve(new("A Song", "SPA", Tag: "one"));
+        Assert.Equal("EXTERNAL_ID_CONFLICT", Assert.Single(conflict.Issues).Code);
+        Assert.Equal(2, conflict.Candidates.Count);
+        Assert.False(conflict.IsResolved);
+        Assert.Contains("IIDX_DATA_TABLE", conflict.Issues[0].Detail);
+        AddExternal(2, "A Song", "A SONG", "one");
+        Assert.Equal("EXTERNAL_ID_AMBIGUOUS", Resolver.Resolve(new("A Song", "SPA", Tag: "one")).Issues[0].Code);
+        Execute("DELETE FROM external_song_ids WHERE external_song_id=1;");
+        var badTag = Resolver.Resolve(new("A Song", "SPA", Tag: "missing"));
+        Assert.Equal("EXTERNAL_ID_REVIEW_REQUIRED", badTag.Issues[0].Code);
+        Assert.Contains(badTag.Issues, i => i.Code == "TAG_NOT_FOUND");
+    }
+
+    [Fact]
+    public void DirectIdsUseExplicitNamespaceAndDoNotSilentlyRescueMissingPrimary()
+    {
+        AddExternal(1, "External", "EXTERNAL", "one");
+        var direct = Resolver.Resolve(new("A Song", "SPA", ExternalSongId: 1, ExternalSourceName: "IIDX_DATA_TABLE"));
+        Assert.True(direct.IsResolved);
+        Assert.Equal("DIRECT_ID", Assert.Single(direct.ExternalEvidence).MatchKind);
+        AssertFailure(new("A Song", "SPA", ExternalSongId: 1), "INVALID_EXTERNAL_ID");
+        AssertFailure(new("A Song", "SPA", ExternalSongId: -1, ExternalSourceName: "IIDX_DATA_TABLE"), "INVALID_EXTERNAL_ID");
+        Assert.Empty(Resolver.Resolve(new("A Song", "SPA", ExternalSongId: 1, ExternalSourceName: "OTHER")).ExternalEvidence);
+        Assert.Empty(Resolver.Resolve(new("A Song", "SPA", ExternalSongId: 999, ExternalSourceName: "IIDX_DATA_TABLE")).ExternalEvidence);
+        var rescue = Resolver.Resolve(new(null, "SPA", ExternalSongId: 1, ExternalSourceName: "IIDX_DATA_TABLE"));
+        Assert.False(rescue.IsResolved);
+        Assert.Equal("EXTERNAL_ID_REVIEW_REQUIRED", rescue.Issues[0].Code);
+        Assert.DoesNotContain(rescue.Issues, i => i.Code.StartsWith("INVALID_", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [MemberData(nameof(ChartKinds))]
+    public void ExternalAgreementKeepsChartBoundariesAndNumericValidation(string style, string difficulty, string longName)
+    {
+        AddExternal(1, "A Song", "A SONG", "one");
+        Assert.True(Resolver.Resolve(new("A Song", longName, style)).IsResolved);
+        AssertFailure(new("A Song", difficulty, style, Level: 11), "LEVEL_MISMATCH");
+        AssertFailure(new("A Song", difficulty, style, TotalNotes: 999), "NOTES_MISMATCH");
+    }
+
+    [Fact]
+    public void SameTagMultipleIdsAreNotAmbiguousAndInactiveMappingsAreNotUsed()
+    {
+        AddExternal(1, "A Song", "A SONG", "one");
+        AddExternal(2, "A Song", "A SONG", "one");
+        Assert.True(Resolver.Resolve(new("A Song", "SPA")).IsResolved);
+        Assert.Equal(2, Resolver.Resolve(new("A Song", "SPA")).ExternalEvidence.Count);
+        Execute("UPDATE external_song_ids SET is_active=0;");
+        Assert.Empty(Resolver.Resolve(new("A Song", "SPA")).ExternalEvidence);
+        AddExternal(3, "Other", "OTHER", "two");
+        Assert.True(Resolver.Resolve(new("Other", "SPA")).IsResolved); // 曲・譜面の非activeは履歴用に許容する。
+        AssertFailure(new("Other", "SPH"), "CHART_NOT_FOUND");
+    }
+
+    private void AddExternal(long id, string title, string normalized, string tag)
+    {
+        using var connection = Database.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO external_song_ids(external_song_id,title,normalized_title,tag) VALUES($id,$title,$key,$tag);";
+        command.Parameters.AddWithValue("$id", id); command.Parameters.AddWithValue("$title", title);
+        command.Parameters.AddWithValue("$key", normalized); command.Parameters.AddWithValue("$tag", tag);
+        command.ExecuteNonQuery();
+    }
+
     private ChartResolution AssertFailure(ChartResolutionRequest request, string code)
     {
         var result = Resolver.Resolve(request);

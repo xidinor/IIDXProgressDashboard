@@ -2,10 +2,13 @@ using Microsoft.Data.Sqlite;
 
 namespace IIDXProgressDashboard.Database;
 
-/// <summary>空のDBにv1を適用し、既存DBでは構造と適用履歴を検証する。</summary>
+/// <summary>既知の構造・履歴を検証し、バックアップ後に未適用Migrationを順番に適用する。</summary>
 public sealed class MigrationRunner
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
+
+    private static readonly string[] SqlFiles = ["001_initial.sql", "002_external_song_ids.sql"];
+    private static readonly string[] Descriptions = ["Initial unified database schema", "Add external song identifiers"];
 
     public void Run(SqliteConnection connection)
     {
@@ -19,48 +22,89 @@ public sealed class MigrationRunner
         // Commitまでに例外が起きれば、usingによる破棄時に変更をロールバックする。
         using var transaction = connection.BeginTransaction(deferred: false);
         var objects = ReadSchema(connection, transaction);
-        if (objects.Count == 0)
+        var version = objects.Count == 0 ? 0 : ValidateExisting(connection, transaction, objects);
+        if (version > 0 && version < CurrentVersion)
+            BackupBeforeMigration(connection);
+        for (var next = version + 1; next <= CurrentVersion; next++)
         {
-            // 空のDBだけに初期DDLを適用し、同じトランザクションでバージョンを記録する。
+            // DDLと版の記録は一括確定する。途中失敗なら、元の版まで全体を戻す。
             // テーブル作成だけ成功して「適用済み」の記録が欠ける状態を残さない。
-            Execute(connection, transaction, ReadInitialSql());
+            Execute(connection, transaction, ReadSql(next));
             using var record = connection.CreateCommand();
             record.Transaction = transaction;
             record.CommandText = "INSERT INTO schema_migrations(version, description) VALUES ($version, $description);";
-            record.Parameters.AddWithValue("$version", CurrentVersion);
-            record.Parameters.AddWithValue("$description", "Initial unified database schema");
+            record.Parameters.AddWithValue("$version", next);
+            record.Parameters.AddWithValue("$description", Descriptions[next - 1]);
             record.ExecuteNonQuery();
-        }
-        else
-        {
-            // 既存DBは検証のみ。Phase 1では旧形式や将来バージョンの変換を行わない。
-            // 更新処理を追加するときは、先にバックアップと復旧手順を用意する。
-            ValidateExisting(connection, transaction, objects);
         }
         // 作成・記録または既存DBの検証がすべて成功した場合だけ確定する。
         transaction.Commit();
     }
 
-    private static void ValidateExisting(SqliteConnection connection, SqliteTransaction transaction,
+    private static int ValidateExisting(SqliteConnection connection, SqliteTransaction transaction,
         Dictionary<string, string> objects)
     {
+        if (!objects.ContainsKey("table:schema_migrations"))
+            throw new InvalidOperationException("旧形式または未知のDBスキーマです。DBは変更されていません。");
+        // 履歴テーブル自体の定義を確認してから問い合わせる。
         // 埋め込みDDLからメモリー上に見本を作り、ファイル名ではなく実際の構造で判定する。
         using var expected = new SqliteConnection("Data Source=:memory:;Foreign Keys=True");
         expected.Open();
-        Execute(expected, null, ReadInitialSql());
+        Execute(expected, null, ReadSql(1));
+        if (objects["table:schema_migrations"] != ReadSchema(expected, null)["table:schema_migrations"])
+            throw new InvalidOperationException("未知のMigration履歴テーブルです。DBは変更されていません。");
+        var version = 0;
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "SELECT version FROM schema_migrations ORDER BY version;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.GetInt64(0) != version + 1 || version == CurrentVersion)
+                    throw new InvalidOperationException("対応していないMigration履歴です。DBは変更されていません。");
+                version++;
+            }
+        }
+        if (version == 0)
+            throw new InvalidOperationException("Migration履歴が空です。DBは変更されていません。");
+        for (var next = 2; next <= version; next++) Execute(expected, null, ReadSql(next));
         var expectedSchema = ReadSchema(expected, null);
         // オブジェクトの増減とSQL定義を厳密に比較する。同じ意味の別表記も不一致となり得る。
         if (objects.Count != expectedSchema.Count || expectedSchema.Any(pair =>
                 !objects.TryGetValue(pair.Key, out var sql) || sql != pair.Value))
             throw new InvalidOperationException("旧形式または未知のDBスキーマです。初期化せず、新しい出力先を指定してください。");
 
-        // 構造が一致しても、適用履歴が「version 1の1行だけ」でなければ受け付けない。
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT version FROM schema_migrations ORDER BY version;";
-        using var reader = command.ExecuteReader();
-        if (!reader.Read() || reader.GetInt64(0) != CurrentVersion || reader.Read())
-            throw new InvalidOperationException("対応していないMigration履歴です。DBは変更されていません。");
+        return version;
+    }
+
+    private static void BackupBeforeMigration(SqliteConnection connection)
+    {
+        // ファイルDBはSQLiteのバックアップAPIでWAL内の確定済みデータも保存する。
+        // 呼出し元の書込予約ロックを保持し、検証・バックアップ・更新間の別書込みを防ぐ。
+        // 同じ接続でBackupDatabaseを呼ぶと書込トランザクションと競合するため読取専用接続を使う。
+        var path = connection.DataSource;
+        if (string.IsNullOrEmpty(path) || path == ":memory:" ||
+            new SqliteConnectionStringBuilder(connection.ConnectionString).Mode == SqliteOpenMode.Memory) return;
+        var backupPath = path + $".pre-v{CurrentVersion}-{Guid.NewGuid():N}.bak";
+        // 失敗途中のファイルを、復旧可能なバックアップと誤認しない名前で残す。
+        var pendingPath = backupPath + ".incomplete";
+        using (new FileStream(pendingPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
+        using var source = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false
+        }.ToString());
+        using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = pendingPath, Mode = SqliteOpenMode.ReadWrite, Pooling = false
+        }.ToString());
+        source.Open();
+        backup.Open();
+        source.BackupDatabase(backup);
+        if (!Equals(Scalar(backup, null, "PRAGMA quick_check;"), "ok"))
+            throw new InvalidOperationException("バックアップの検証に失敗したためMigrationを中止しました。");
+        backup.Close();
+        File.Move(pendingPath, backupPath);
     }
 
     private static Dictionary<string, string> ReadSchema(SqliteConnection connection, SqliteTransaction? transaction)
@@ -75,12 +119,12 @@ public sealed class MigrationRunner
         return result;
     }
 
-    private static string ReadInitialSql()
+    private static string ReadSql(int version)
     {
         // ビルド時に埋め込んだSQLを読み、実行場所や外部SQLファイルの配置に依存させない。
         using var stream = typeof(MigrationRunner).Assembly.GetManifestResourceStream(
-            "IIDXProgressDashboard.Database.Migrations.001_initial.sql")
-            ?? throw new InvalidOperationException("初期DDLリソースが見つかりません。");
+            "IIDXProgressDashboard.Database.Migrations." + SqlFiles[version - 1])
+            ?? throw new InvalidOperationException("MigrationのDDLリソースが見つかりません。");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

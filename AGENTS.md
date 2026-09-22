@@ -215,6 +215,14 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-23 外部楽曲IDの補助照合
+
+- ユーザー指示によりIssue #26の劣後対応を実装対象へ移した。`external_song_ids`をMigration 002で追加し、songs.tag・charts.chart_id・既存履歴の識別は変更しない。ソースマスター・内部song_idは新設しない。
+- 初期ソースは`IIDX_DATA_TABLE`。楽曲情報のキーを数値ID、曲名JSONを独立title、textage-tag JSONを既存songsへのアンカーとする。正規化は既存TitleNormalizer。外部の処理済み曲名逆引き・同名候補の間引き規則を流用しない。
+- 現行のtag・タイトル・alias経路を主とし、同一曲に双方一致または主経路のみ一致は従来の譜面検証後に確定。別曲への矛盾と外部側のみ一致は手動確認へ送り、双方不一致は従来処理を維持する。外部側の複数tag候補は未解決とする。
+- 元入力の直接IDと曲名由来のID候補を区別する。Phase 3・4・5本体には専用の外部ID判定を作らず共通Resolverを利用する。新規テストは外部登録・照合・組合せ判断が中心で、Importer統合は代表ケースに絞る。
+- 実装では配信IDの欠落・別tagへの変更・古い取得結果を全体保留し、未知tagは元行付きで保留する。既存履歴の自動付替え、個人DBの更新、UI接続は今回の完了に含めない。詳細は[外部ID照合解説](docs/phase2-followup-external-song-id-matching.md)と[Migration解説](docs/phase1-followup-external-song-ids-migration.md)を参照。
+
 ### 2026-09-21 Phase 5-2の確定事項
 
 - ユーザー承認：難易度表は1表単位で反映する。完全取得・有効入力の照合未解決は保留し、一意に解決できた正常行を反映する。不完全取得・不正・重複競合は表全体を保留する。
