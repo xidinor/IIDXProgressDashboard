@@ -175,6 +175,60 @@ public sealed class RefluxImporterTests : IDisposable
     }
 
     [Fact]
+    public async Task MasterLevelCorrectionResolvesOriginalRowOnceAndPreservesHistory()
+    {
+        // 既登録プレイと、旧マスターのlevelだけが一致しない元行を同じSessionに置く。
+        Write(Row, Row.Replace("\t11\t", "\t12\t"));
+        var first = await Importer.ImportAsync(Input, id);
+        Assert.Equal((1, 1), (first.Imported, first.Unresolved));
+        var existingRaw = Sql("SELECT raw_data FROM play_history");
+        var unresolvedRaw = Sql("SELECT raw_data FROM unresolved_imports");
+        var chartId = Sql("SELECT chart_id FROM play_history");
+        Assert.Equal("LEVEL_MISMATCH", Sql("SELECT reason_code FROM unresolved_imports"));
+
+        // マスターの確定情報のみ更新。入力・Session ID・譜面IDは変更しない。
+        Sql("UPDATE charts SET level=12 WHERE tag='one' AND play_style='DP' AND difficulty='A'");
+        var second = await Importer.ImportAsync(Input, id);
+        Assert.Equal((1, 1, 0, "SUCCESS"), (second.Imported, second.Duplicates, second.Unresolved, second.Status));
+        Assert.Equal(existingRaw, Sql("SELECT raw_data FROM play_history ORDER BY play_id LIMIT 1"));
+        Assert.Equal(unresolvedRaw, Sql("SELECT raw_data FROM play_history ORDER BY play_id DESC LIMIT 1"));
+        Assert.Equal(unresolvedRaw, Sql("SELECT raw_data FROM unresolved_imports"));
+        Assert.Equal("RESOLVED", Sql("SELECT status FROM unresolved_imports"));
+        Assert.Equal(chartId, Sql("SELECT resolved_chart_id FROM unresolved_imports"));
+        Assert.Equal(1L, Sql("SELECT COUNT(*) FROM play_history WHERE level_at_play=11"));
+        Assert.Equal(1L, Sql("SELECT COUNT(*) FROM play_history WHERE level_at_play=12"));
+        Assert.Equal(2L, Sql("SELECT COUNT(*) FROM play_history WHERE score=1500 AND total_notes_at_play=1000 AND miss_count IS NULL"));
+        var third = await Importer.ImportAsync(Input, id);
+        Assert.Equal((0, 2, 0), (third.Imported, third.Duplicates, third.Unresolved));
+        Assert.Equal(1L, Sql("SELECT COUNT(*) FROM unresolved_imports"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SameOfficialTitleRemainsPendingAfterAliasEvenWithOnlyOneMatchingChart(bool otherHasChart)
+    {
+        // 同名の曲情報だけの候補と、別Notesの候補をそれぞれ再現する。
+        // 譜面の有無・数値・aliasによる正式曲名候補の強制選択は現行契約にない。
+        Sql("INSERT INTO songs(tag,title,normalized_title) VALUES ('other','合成曲','合成曲')");
+        if (otherHasChart)
+            Sql("INSERT INTO charts(tag,play_style,difficulty,level,total_notes) VALUES ('other','DP','A',9,900)");
+        Write(Row);
+        var first = await Importer.ImportAsync(Input, id);
+        Assert.Equal((0, 1), (first.Imported, first.Unresolved));
+        var raw = Sql("SELECT raw_data FROM unresolved_imports");
+        new SongAliasRepository(Database, Path.Combine(directory, "backups"))
+            .Register("one", "合成曲", "REFLUX_SESSION_TSV");
+        var second = await Importer.ImportAsync(Input, id);
+        Assert.Equal((0, 0, 1, "PARTIAL"), (second.Imported, second.Duplicates, second.Unresolved, second.Status));
+        Assert.Equal(0L, Sql("SELECT COUNT(*) FROM play_history"));
+        Assert.Equal(2L, Sql("SELECT COUNT(*) FROM unresolved_imports WHERE status='PENDING' AND reason_code='AMBIGUOUS_SONG'"));
+        Assert.Equal(1L, Sql("SELECT COUNT(DISTINCT source_record_key) FROM unresolved_imports"));
+        Assert.Equal(1L, Sql("SELECT COUNT(DISTINCT raw_data) FROM unresolved_imports"));
+        Assert.Equal(raw, Sql("SELECT raw_data FROM unresolved_imports ORDER BY unresolved_id DESC LIMIT 1"));
+    }
+
+    [Fact]
     public async Task OptionalColumnsMapToStorageWithoutPersistingGradeAsAggregate()
     {
         File.WriteAllText(Input, "title\tdifficulty\tlamp\texscore\tdate\tplaytype\tgaugepercent\tpgreat\tgreat\tgood\tbad\tpoor\tcombobreak\tfast\tslow\tassist\trange\tgrade\n" +
