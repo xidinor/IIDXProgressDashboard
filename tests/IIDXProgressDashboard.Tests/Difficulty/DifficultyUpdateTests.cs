@@ -38,6 +38,93 @@ public sealed class DifficultyUpdateTests : IDisposable
         new DifficultyTableParser().Parse(kind, DifficultySource.FromUtf8(DifficultyTableDefinition.Get(kind).Url, Encoding.UTF8.GetBytes(text)));
     private Task<DifficultyUpdatePlan> Plan(params string[] rows) => Service.PrepareAsync(Parse("[" + string.Join(',', rows) + "]"));
 
+    [Fact]
+    public async Task ProviderToFourTablesKeepsUnplayedChartsAndIndependentRankDictionaries()
+    {
+        // HTTP境界だけを合成し、Provider・共通照合・実SQLite更新を最後まで通す。
+        using var client = new System.Net.Http.HttpClient(new FourTableHandler());
+        var provider = new DifficultyTableProvider(client);
+        var immutable = Dump("songs", "charts", "play_history", "song_aliases");
+        foreach (var input in await provider.FetchAllAsync())
+        {
+            Assert.True(input.IsValid);
+            var result = await Service.ApplyAsync(await Service.PrepareAsync(input));
+            Assert.Equal("SUCCESS", result.Status);
+            Assert.Equal(input.Table.Level == 11 ? 1 : 3, result.Counts.Added);
+        }
+        var before = Dump("difficulty_tables", "difficulty_ranks", "difficulty_table_entries");
+        foreach (var input in await provider.FetchAllAsync())
+        {
+            var repeat = await Service.ApplyAsync(await Service.PrepareAsync(input));
+            Assert.Equal(new(0, 0, input.Rows.Count), repeat.Counts);
+        }
+        Assert.Equal(before, Dump("difficulty_tables", "difficulty_ranks", "difficulty_table_entries"));
+        Assert.Equal(immutable, Dump("songs", "charts", "play_history", "song_aliases"));
+        Assert.Equal(6L, Scalar("SELECT count(*) FROM difficulty_table_entries e WHERE NOT EXISTS (SELECT 1 FROM play_history h WHERE h.chart_id=e.chart_id);"));
+        Assert.Equal(74L, Scalar("SELECT count(*) FROM difficulty_ranks;"));
+        Assert.Equal(1L, Scalar("SELECT count(*) FROM difficulty_ranks WHERE rank_code='EXTREME_KOJINSA' AND rank_kind='SPECIAL' AND sort_order=110;"));
+        Assert.Equal(2L, Scalar("SELECT count(*) FROM difficulty_ranks WHERE rank_code='UNDECIDED' AND sort_order=-10;"));
+        Assert.Equal(2L, Scalar("SELECT count(*) FROM difficulty_ranks WHERE rank_code='UNRATED' AND sort_order=-20;"));
+        Assert.Equal(3L, Scalar("SELECT count(*) FROM difficulty_ranks WHERE rank_code='KOJINSA_E' AND sort_order=15;"));
+        Assert.Equal(2L, Scalar("SELECT count(*) FROM difficulty_ranks WHERE rank_code='JIRIKI_A_PLUS' AND sort_order=80;"));
+        Assert.Equal(3L, Scalar("SELECT count(*) FROM difficulty_table_entries WHERE rank_code='JIRIKI_S';"));
+        Assert.Equal(3L, Scalar("SELECT count(*) FROM difficulty_table_entries WHERE rank_code='UNRATED';"));
+        // 契約の降順を独立した期待値で比較し、辞書の同値再生成だけを検証しない。
+        string eleven = "JIRIKI_S_PLUS,KOJINSA_S_PLUS,JIRIKI_S,KOJINSA_S,JIRIKI_A,KOJINSA_A,JIRIKI_B,KOJINSA_B,JIRIKI_C,KOJINSA_C,JIRIKI_D,KOJINSA_D,JIRIKI_E,KOJINSA_E,JIRIKI_F,UNDECIDED";
+        string twelve = "JIRIKI_S_PLUS,KOJINSA_S_PLUS,JIRIKI_S,KOJINSA_S,JIRIKI_A_PLUS,KOJINSA_A_PLUS,JIRIKI_A,KOJINSA_A,JIRIKI_B_PLUS,KOJINSA_B_PLUS,JIRIKI_B,KOJINSA_B,JIRIKI_C,KOJINSA_C,JIRIKI_D,KOJINSA_D,JIRIKI_E,KOJINSA_E,JIRIKI_F,KOJINSA_F,UNRATED";
+        Assert.Equal(eleven, OrderedRanks("ATWIKI_BEMANI2SP11_SP11_NORMAL"));
+        Assert.Equal("EXTREME_KOJINSA," + eleven.Replace("KOJINSA_E,", ""), OrderedRanks("ATWIKI_BEMANI2SP11_SP11_HARD"));
+        Assert.Equal(twelve, OrderedRanks(Code));
+        Assert.Equal(twelve, OrderedRanks("IIDX_SP12_GITHUB_SP12_HARD"));
+        Assert.Null(Scalar("PRAGMA foreign_key_check;"));
+    }
+
+    private string OrderedRanks(string tableCode)
+    {
+        using var connection = Database.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT group_concat(rank_code) FROM (SELECT r.rank_code FROM difficulty_ranks r JOIN difficulty_tables t USING(table_id) WHERE t.table_code=$code ORDER BY r.sort_order DESC);";
+        command.Parameters.AddWithValue("$code", tableCode);
+        return (string)command.ExecuteScalar()!;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProviderRejectsDpInputAndPreservesTableOnLevelMismatch(bool wrongLevel)
+    {
+        using var client = new System.Net.Http.HttpClient(new FourTableHandler());
+        var provider = new DifficultyTableProvider(client);
+        var input = await provider.FetchAsync(DifficultyTableKind.Sp11Normal);
+        await Service.ApplyAsync(await Service.PrepareAsync(input));
+        var before = Dump("difficulty_tables", "difficulty_ranks", "difficulty_table_entries");
+        if (wrongLevel)
+            Execute("UPDATE charts SET level=12 WHERE tag='synth';");
+        else
+            input = await provider.ParseAsync(input.Table.Kind, DifficultySource.FromUtf8(input.Table.Url,
+                Encoding.UTF8.GetBytes(DifficultyProviderTests.Wiki(input.Table.Kind).Replace("?1XB00", "?DXB00"))));
+        var result = await Service.ApplyAsync(await Service.PrepareAsync(input));
+        // level矛盾は未解決、DP混入は表不正。どちらでも直前の評価を保全する。
+        Assert.Equal(wrongLevel ? "PARTIAL" : "FAILED", result.Status);
+        Assert.Equal(before, Dump("difficulty_tables", "difficulty_ranks", "difficulty_table_entries"));
+        Assert.Equal(0, result.Counts.Added + result.Counts.Updated);
+        Assert.True((long)Scalar("SELECT count(*) FROM unresolved_imports;")! > 0);
+    }
+
+    private sealed class FourTableHandler : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken token)
+        {
+            var kind = request.RequestUri!.AbsolutePath.EndsWith("22.html") ? DifficultyTableKind.Sp11Normal
+                : request.RequestUri.AbsolutePath.EndsWith("21.html") ? DifficultyTableKind.Sp11Hard : DifficultyTableKind.Sp12Normal;
+            var text = kind == DifficultyTableKind.Sp12Normal
+                ? "[" + string.Join(',', new[] { Row(difficulty: "H"), Row(), Row(difficulty: "L") }) + "]"
+                : DifficultyProviderTests.Wiki(kind);
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            { Content = new System.Net.Http.StringContent(text, Encoding.UTF8, kind == DifficultyTableKind.Sp12Normal ? "application/json" : "text/html") });
+        }
+    }
+
     [Theory]
     [InlineData(DifficultyTableKind.Sp11Normal)]
     [InlineData(DifficultyTableKind.Sp11Hard)]

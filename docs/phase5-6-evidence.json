@@ -1,0 +1,197 @@
+{
+  "validatedAt": "2026-09-22T11:45:54.5706982+00:00",
+  "master": {
+    "songs": 2746,
+    "charts": 16916,
+    "ParserVersion": "2",
+    "sources": {
+      "titletbl.js": "23E76F4ADA10B2D7E0E38CD50F4D140EEB0B1588D3DF5F2A207ED40CDF8B7CF3",
+      "scrlist.js": "6227C836981E6B19A42E47C0F29D84DB4F5DA64D6E314763151A0CF65450F7BF",
+      "datatbl.js": "D877EEA75B738E3DC49A14933901B204545063DBF9AA9E70D4392F70BD810CFA",
+      "actbl.js": "F4C2AE932B6660CB0F76057194918F841C37453EC693B5CE75DC7EFDDD9D143C",
+      "cstbl.js": "1C887E4164F9DB637F13C1625C1DC8FF20A5B9E8ED10A34E6B54549135DCEF63",
+      "cstbl1.js": "D362E743C8CC01AAAC64653FB76927CB62ED710CD37CC888E8F746C7C05B4947",
+      "cstbl2.js": "0B7E1DD1F8BE1F9014D8EA5CBB79E6274328319E62B21E7858FEA3862F57E5EA"
+    },
+    "limitation": "Local Textage snapshot; live HTTP/catalog coverage in Issue #13 remains unverified."
+  },
+  "tables": [
+    {
+      "table": "ATWIKI_BEMANI2SP11_SP11_NORMAL",
+      "rows": 608,
+      "source": {
+        "RequestedUrl": "https://w.atwiki.jp/bemani2sp11/pages/22.html",
+        "InputKind": "SAVED_HTML",
+        "Sha256": "6C758DCD7F84798C66224BEC61D9B0AA0E874A19CFD3DF78588A000FEE041BC9",
+        "ByteLength": 718507,
+        "StartedAt": "2026-09-22T11:42:41.4114962+00:00",
+        "CompletedAt": "2026-09-22T11:42:41.4223701+00:00",
+        "ETag": null,
+        "LastModified": null,
+        "SourceRevision": null
+      },
+      "reasons": {
+        "NOTES_MISMATCH": 1,
+        "TAG_TITLE_MISMATCH": 24
+      },
+      "statuses": {
+        "Resolved": 583,
+        "Unresolved": 25
+      },
+      "first": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 583,
+          "Updated": 0,
+          "Unchanged": 0
+        },
+        "Unresolved": 25
+      },
+      "repeat": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 0,
+          "Updated": 0,
+          "Unchanged": 583
+        },
+        "Unresolved": 25
+      },
+      "failure": "FAILED",
+      "preserved": true
+    },
+    {
+      "table": "ATWIKI_BEMANI2SP11_SP11_HARD",
+      "rows": 608,
+      "source": {
+        "RequestedUrl": "https://w.atwiki.jp/bemani2sp11/pages/21.html",
+        "InputKind": "SAVED_HTML",
+        "Sha256": "81B78DADC2D46CCF51AA91D8106B6280109C22688B08A29019339108DB5A7705",
+        "ByteLength": 717261,
+        "StartedAt": "2026-09-22T11:42:41.9992664+00:00",
+        "CompletedAt": "2026-09-22T11:42:42.0020546+00:00",
+        "ETag": null,
+        "LastModified": null,
+        "SourceRevision": null
+      },
+      "reasons": {
+        "NOTES_MISMATCH": 1,
+        "TAG_TITLE_MISMATCH": 24
+      },
+      "statuses": {
+        "Resolved": 583,
+        "Unresolved": 25
+      },
+      "first": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 583,
+          "Updated": 0,
+          "Unchanged": 0
+        },
+        "Unresolved": 25
+      },
+      "repeat": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 0,
+          "Updated": 0,
+          "Unchanged": 583
+        },
+        "Unresolved": 25
+      },
+      "failure": "FAILED",
+      "preserved": true
+    },
+    {
+      "table": "IIDX_SP12_GITHUB_SP12_NORMAL",
+      "rows": 671,
+      "source": {
+        "RequestedUrl": "https://iidx-sp12.github.io/songs.json",
+        "InputKind": "HTTP_BODY",
+        "Sha256": "0F1A8E89FCF1BDB5978DFEFE556ADE4991ED3A954C837508CB7E68A910C93402",
+        "ByteLength": 130365,
+        "StartedAt": "2026-09-22T11:42:42.286998+00:00",
+        "CompletedAt": "2026-09-22T11:42:42.6590364+00:00",
+        "ETag": "\u00226a807efd-1fd3d\u0022",
+        "LastModified": "2026-08-15T15:00:13.0000000\u002B00:00",
+        "SourceRevision": null
+      },
+      "reasons": {
+        "AMBIGUOUS_SONG": 27,
+        "SONG_NOT_FOUND": 20
+      },
+      "statuses": {
+        "Resolved": 624,
+        "Unresolved": 47
+      },
+      "first": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 624,
+          "Updated": 0,
+          "Unchanged": 0
+        },
+        "Unresolved": 47
+      },
+      "repeat": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 0,
+          "Updated": 0,
+          "Unchanged": 624
+        },
+        "Unresolved": 47
+      },
+      "failure": "FAILED",
+      "preserved": true
+    },
+    {
+      "table": "IIDX_SP12_GITHUB_SP12_HARD",
+      "rows": 671,
+      "source": {
+        "RequestedUrl": "https://iidx-sp12.github.io/songs.json",
+        "InputKind": "HTTP_BODY",
+        "Sha256": "0F1A8E89FCF1BDB5978DFEFE556ADE4991ED3A954C837508CB7E68A910C93402",
+        "ByteLength": 130365,
+        "StartedAt": "2026-09-22T11:42:42.286998+00:00",
+        "CompletedAt": "2026-09-22T11:42:42.6590364+00:00",
+        "ETag": "\u00226a807efd-1fd3d\u0022",
+        "LastModified": "2026-08-15T15:00:13.0000000\u002B00:00",
+        "SourceRevision": null
+      },
+      "reasons": {
+        "AMBIGUOUS_SONG": 27,
+        "SONG_NOT_FOUND": 20
+      },
+      "statuses": {
+        "Resolved": 624,
+        "Unresolved": 47
+      },
+      "first": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 624,
+          "Updated": 0,
+          "Unchanged": 0
+        },
+        "Unresolved": 47
+      },
+      "repeat": {
+        "Status": "PARTIAL",
+        "Counts": {
+          "Added": 0,
+          "Updated": 0,
+          "Unchanged": 624
+        },
+        "Unresolved": 47
+      },
+      "failure": "FAILED",
+      "preserved": true
+    }
+  ],
+  "entries": 2414,
+  "quickCheck": "ok",
+  "foreignKeyViolations": 0,
+  "originalHashesUnchanged": true,
+  "limitation": "Wiki SAVED_HTML, not production browser acquisition. Failure response is synthetic HTTP 403. No personal history imported."
+}
