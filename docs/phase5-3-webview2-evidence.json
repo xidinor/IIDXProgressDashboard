@@ -1,0 +1,41 @@
+{
+  "runtime": "153.0.4234.48",
+  "tables": [
+    {
+      "table": "ATWIKI_BEMANI2SP11_SP11_NORMAL",
+      "AcquisitionStatus": "COMPLETE",
+      "ParseStatus": "VALID",
+      "ReadComplete": true,
+      "rows": 608,
+      "Diagnostics": [],
+      "source": {
+        "RequestedUrl": "https://w.atwiki.jp/bemani2sp11/pages/22.html",
+        "FinalUrl": "https://w.atwiki.jp/bemani2sp11/pages/22.html",
+        "InputKind": "BROWSER_DOM",
+        "Sha256": "4E9429CACB18539254156CB12627B98C8704FBB048E0564433AC18C52615A91D",
+        "ByteLength": 723774,
+        "StartedAt": "2026-09-22T12:12:07.9706694+00:00",
+        "CompletedAt": "2026-09-22T12:12:10.2486059+00:00",
+        "HttpStatus": 200
+      }
+    },
+    {
+      "table": "ATWIKI_BEMANI2SP11_SP11_HARD",
+      "AcquisitionStatus": "COMPLETE",
+      "ParseStatus": "VALID",
+      "ReadComplete": true,
+      "rows": 608,
+      "Diagnostics": [],
+      "source": {
+        "RequestedUrl": "https://w.atwiki.jp/bemani2sp11/pages/21.html",
+        "FinalUrl": "https://w.atwiki.jp/bemani2sp11/pages/21.html",
+        "InputKind": "BROWSER_DOM",
+        "Sha256": "4138C25A790E7F32E27B5648CB55E7DD74CC026A47190D593BE467092C3A56AC",
+        "ByteLength": 718411,
+        "StartedAt": "2026-09-22T12:12:11.0372469+00:00",
+        "CompletedAt": "2026-09-22T12:12:12.6623547+00:00",
+        "HttpStatus": 200
+      }
+    }
+  ]
+}
