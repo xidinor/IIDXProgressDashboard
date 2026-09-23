@@ -58,6 +58,29 @@ public sealed class BetaDisplayTests
             // 同じ配置先での準備し直しは拒否し、GUID・履歴を保持する。
             await Assert.ThrowsAsync<IOException>(() => BetaPreparation.PrepareAsync(target, seed, legacy));
             Assert.Equal(settings.SourceId, BetaSettings.Read(target).SourceId);
+
+            // Beta2は既存Importer内部を再検証せず、旧履歴→Reflux→一覧/グラフ共通モデルを確認。
+            var tsv = Path.Combine(directory, "Session.tsv");
+            const string header = "title\tdifficulty\tlamp\texscore\tmisscount\tdate\n";
+            const string row = "Song\tSPA\tEC\t1500\t-\t2026/09/23 12:34:56\n";
+            File.WriteAllText(tsv, header + row);
+            var reflux = new BetaRefluxImport(settings);
+            var imported = await reflux.ImportAsync(tsv, null, new());
+            Assert.Equal("SUCCESS", imported.Status); Assert.Equal(1, imported.Imported);
+            var saved = Assert.Single(new BetaRefluxImport(settings).ReadSessions());
+            var duplicate = await reflux.ImportAsync(tsv, null, new());
+            Assert.Equal(1, duplicate.Duplicates); Assert.Equal(0, duplicate.Imported);
+            var renamed = Path.Combine(directory, "Renamed.tsv");
+            File.Copy(tsv, renamed);
+            File.AppendAllText(renamed, "Song\tSPA\tHC\t1900\t4\t2026/09/23 12:35:56\n");
+            var appended = await reflux.ImportAsync(renamed, saved.Id, saved.Options);
+            Assert.Equal(1, appended.Imported); Assert.Equal(1, appended.Duplicates);
+            Assert.Equal(2, (await reflux.ImportAsync(renamed, null, saved.Options)).Duplicates);
+            sp = new DashboardRepository(settings.DatabasePath).Read().Charts.Single(c => c.ChartId == 1);
+            Assert.Equal(4, sp.History.Count); Assert.Equal(1900, sp.Latest!.Score); Assert.Equal(1900, sp.BestScore);
+            Assert.Equal(0, sp.MinimumBp); Assert.Null(sp.History[2].MissCount);
+            Assert.False(sp.History[2].MinutePrecision); Assert.Equal("2026-09-23T12:34:56Z", sp.History[2].PlayedAt);
+            Assert.Equal(before, File.ReadAllBytes(legacy));
         }
         finally { Directory.Delete(directory, true); }
     }

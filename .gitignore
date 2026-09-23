@@ -373,6 +373,7 @@ FodyWeavers.xsd
 IIDXProgressDashboard.ini
 beta-preparation*.txt
 beta-preparation.lock
+reflux-sessions/
 
 # CSV and TSV data files
 *.csv

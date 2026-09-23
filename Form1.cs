@@ -15,6 +15,8 @@ public partial class Form1 : Form
     private DashboardSnapshot? snapshot;
     private BetaSettings? settings;
     private bool loading;
+    private readonly Button importReflux = new() { Text = "Reflux取込", AutoSize = true };
+    private bool importing;
     private bool searching;
     private bool renderingRanks;
     private string? selectedRank;
@@ -22,7 +24,7 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
-        Text = "IIDX Progress Dashboard — Beta";
+        Text = "IIDX Progress Dashboard — Beta2";
         MinimumSize = new Size(1050, 640); Size = new Size(1350, 850);
         Controls.Clear();
         cmbLevel.Items.Clear(); cmbLevel.DropDownStyle = ComboBoxStyle.DropDownList; cmbLevel.Width = 285;
@@ -33,7 +35,9 @@ public partial class Form1 : Form
         var find = new Button { Text = "検索", AutoSize = true };
         var ranks = new Button { Text = "ランクへ戻る", AutoSize = true };
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
-        toolbar.Controls.AddRange([cmbLevel, btnLoad, search, style, difficulty, find, ranks]);
+        toolbar.Controls.AddRange([cmbLevel, btnLoad, importReflux, search, style, difficulty, find, ranks]);
+        importReflux.Click += async (_, _) => await ImportRefluxAsync();
+        FormClosing += (_, e) => { if (importing) e.Cancel = true; };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(10) };
         layout.RowStyles.Add(new(SizeType.AutoSize)); layout.RowStyles.Add(new(SizeType.Percent, 100)); layout.RowStyles.Add(new(SizeType.AutoSize));
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, Size = new Size(1200, 700), SplitterDistance = 280 };
@@ -72,7 +76,7 @@ public partial class Form1 : Form
     private async Task LoadDataAsync()
     {
         if (loading) return;
-        loading = true; btnLoad.Enabled = false; status.Text = "読み込み中…";
+        loading = true; btnLoad.Enabled = false; importReflux.Enabled = false; status.Text = "読み込み中…";
         try
         {
             var result = await Task.Run(() =>
@@ -98,7 +102,28 @@ public partial class Form1 : Form
             snapshot = null; dgvStats.Rows.Clear(); chartsGrid.Rows.Clear(); status.Text = "読み込み失敗：" + ex.Message;
             MessageBox.Show(this, ex.Message + "\n本体横のINIと表示用DBを確認してください。", "ベータ版の読み込み", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { loading = false; if (!IsDisposed) btnLoad.Enabled = true; }
+        finally { loading = false; if (!IsDisposed) { btnLoad.Enabled = !importing; importReflux.Enabled = !importing && snapshot != null; } }
+    }
+
+    private async Task ImportRefluxAsync()
+    {
+        if (loading || importing || settings is null) return;
+        try
+        {
+            var importer = new BetaRefluxImport(settings);
+            using var dialog = new RefluxImportDialog(importer.ReadSessions());
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            importing = true; importReflux.Enabled = false; btnLoad.Enabled = false;
+            status.Text = "Reflux取込中… 完了までお待ちください。";
+            var path = dialog.SourcePath; var id = dialog.SessionId; var options = dialog.Options;
+            var result = await Task.Run(() => importer.ImportAsync(path, id, options));
+            // 一覧と開いているグラフへ、旧履歴を含む同一DBのsnapshotを再配信する。
+            await LoadDataAsync();
+            MessageBox.Show(this, $"{result.Status}{(result.SessionHeld ? "（Session全体を保留）" : "")}\n読込 {result.Read} / 登録 {result.Imported} / 重複 {result.Duplicates}\n未解決 {result.Unresolved} / 不正 {result.Invalid} / 競合 {result.Conflicts}",
+                "Reflux取込結果", MessageBoxButtons.OK, result.Status == "SUCCESS" ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Reflux取込失敗", MessageBoxButtons.OK, MessageBoxIcon.Error); status.Text = "Reflux取込失敗：" + ex.Message; }
+        finally { importing = false; importReflux.Enabled = snapshot != null; btnLoad.Enabled = true; }
     }
 
     private TableView? CurrentTable => snapshot?.Tables.FirstOrDefault(t => t.Code == ((DifficultyTableDefinition)cmbLevel.SelectedItem!).Code);
