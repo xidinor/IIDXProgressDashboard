@@ -8,7 +8,7 @@ IIDX / INFINITASの実プレイ履歴から、クリア状況とスコア・BP�
 
 ローカルの準備済みアプリは `artifacts/beta-preview/IIDXProgressDashboard.exe`。本体横のINIと表示用DBを使用します。旧形式DBを通常DBとして直接開くことはできません。
 
-**必要ファイル、旧履歴の事前準備、操作方法、検証結果と制約は [Phase 6ベータ版の説明](docs/phase6-beta-display.md) を参照してください。** 通常起動では取込・Web取得を実行しません。取込・更新・未解決確認などの運用画面は後続です。
+**必要ファイル、旧履歴の事前準備、表示仕様は [Beta1の説明](docs/phase6-beta-display.md) を参照してください。** Beta2では「Reflux取込」からSession TSVを同じDBへ追加でき、一覧・グラフを再読込します。Sessionの再利用・時刻設定・検証範囲は [Beta2の説明](docs/phase6-beta2-reflux.md) を参照してください。起動時の自動取込・Web取得は行いません。
 
 ## 開発
 
