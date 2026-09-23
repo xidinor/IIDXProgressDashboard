@@ -370,6 +370,9 @@ FodyWeavers.xsd
 *.pre-v*-*.bak
 *.pre-v*-*.bak.*
 *.pkl
+IIDXProgressDashboard.ini
+beta-preparation*.txt
+beta-preparation.lock
 
 # CSV and TSV data files
 *.csv
