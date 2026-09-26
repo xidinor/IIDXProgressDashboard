@@ -220,6 +220,7 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 - ユーザー依頼により、起動時のPENDING確認・案内と手動確認画面を追加した。確認案内と操作画面はキャンセル可能。画面内の確定予定は保存までDBへ書かず、キャンセルで破棄する。
 - 旧履歴・Refluxの保存元行を対象に、利用者が譜面と判断理由を選んで当該行だけを確定する。aliasや後続行の自動照合へ波及させない。元キー・raw_dataを保持し、手動判断はimport_runsのMANUAL_PLAY_RESOLUTIONに記録する。
 - SP/DP・譜面種別・level/Notesの矛盾、不正値、元行変更競合、登録済み履歴の付替えは拒否する。難易度表・外部マスター・Session全体の保留は画面で確認できるが、この履歴登録操作の対象外。詳細は[手動確認画面の解説](docs/phase6-manual-play-resolution.md)を参照。
+- 2026-09-27追加：同一の移行元／Session GUID・種別・元曲名・譜面表記の未解決元行を一括選択できる。元行ごとの再検証と独立した履歴保持を維持し、保存前に一括対象件数を確認する。異なる元IDの行を曲名一致だけで一括対象にしない。
 
 ### 2026-09-23 外部楽曲IDの補助照合
 
