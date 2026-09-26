@@ -106,4 +106,6 @@ Score Rate / DJ LEVELは現行Notesのみを使用する。NULL・0は理由付�
 
 ## 履歴・グラフの追加改善（2026-09-26）
 
+未解決履歴の手動確認・保存と起動時案内は[手動確認画面の解説](phase6-manual-play-resolution.md)に記録した。上記の「未解決解消UI未実装」は2026-09-23時点の状況である。
+
 その後の局所的な追加は、[オプション列](phase6-history-options.md)、[整数の横軸目盛り](phase6-history-axis.md)、[多重記録の表示フィルタ](phase6-history-repeated-filter.md)に分けて記録した。この節より上の検証結果は2026-09-23時点の記録であり、追加改善の検証結果は各文書を参照する。

@@ -215,6 +215,12 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 ## 実装前に決める事項（仕様では未確定）
 
+### 2026-09-26 Beta3：未解決履歴の手動確認
+
+- ユーザー依頼により、起動時のPENDING確認・案内と手動確認画面を追加した。確認案内と操作画面はキャンセル可能。画面内の確定予定は保存までDBへ書かず、キャンセルで破棄する。
+- 旧履歴・Refluxの保存元行を対象に、利用者が譜面と判断理由を選んで当該行だけを確定する。aliasや後続行の自動照合へ波及させない。元キー・raw_dataを保持し、手動判断はimport_runsのMANUAL_PLAY_RESOLUTIONに記録する。
+- SP/DP・譜面種別・level/Notesの矛盾、不正値、元行変更競合、登録済み履歴の付替えは拒否する。難易度表・外部マスター・Session全体の保留は画面で確認できるが、この履歴登録操作の対象外。詳細は[手動確認画面の解説](docs/phase6-manual-play-resolution.md)を参照。
+
 ### 2026-09-23 外部楽曲IDの補助照合
 
 - ユーザー指示によりIssue #26の劣後対応を実装対象へ移した。`external_song_ids`をMigration 002で追加し、songs.tag・charts.chart_id・既存履歴の識別は変更しない。ソースマスター・内部song_idは新設しない。
