@@ -169,7 +169,7 @@ public sealed class LegacyInfinitasLogImporter
         }
     }
 
-    private static void InsertPlay(SqliteConnection c, SqliteTransaction t, long runId, string key,
+    internal static void InsertPlay(SqliteConnection c, SqliteTransaction t, long runId, string key,
         LegacySourceRow row, LegacyConvertedRow value, long chart) => Execute(c, t, """
         INSERT INTO play_history(chart_id,played_at,clear_lamp,score,miss_count,level_at_play,total_notes_at_play,
             source_system,source_record_key,import_run_id,raw_data)

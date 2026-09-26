@@ -1,6 +1,7 @@
 using IIDXProgressDashboard.Database;
 using IIDXProgressDashboard.Dashboard;
 using IIDXProgressDashboard.Difficulty;
+using IIDXProgressDashboard.Import;
 
 namespace IIDXProgressDashboard;
 
@@ -16,6 +17,8 @@ public partial class Form1 : Form
     private BetaSettings? settings;
     private bool loading;
     private readonly Button importReflux = new() { Text = "Reflux取込", AutoSize = true };
+    private readonly Button resolvePending = new() { Text = "未解決行を確認", AutoSize = true, Enabled = false };
+    private bool startupAuditDone;
     private bool importing;
     private bool searching;
     private bool renderingRanks;
@@ -24,7 +27,7 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
-        Text = "IIDX Progress Dashboard — Beta2";
+        Text = "IIDX Progress Dashboard — Beta3";
         MinimumSize = new Size(1050, 640); Size = new Size(1350, 850);
         Controls.Clear();
         cmbLevel.Items.Clear(); cmbLevel.DropDownStyle = ComboBoxStyle.DropDownList; cmbLevel.Width = 285;
@@ -35,8 +38,9 @@ public partial class Form1 : Form
         var find = new Button { Text = "検索", AutoSize = true };
         var ranks = new Button { Text = "ランクへ戻る", AutoSize = true };
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
-        toolbar.Controls.AddRange([cmbLevel, btnLoad, importReflux, search, style, difficulty, find, ranks]);
+        toolbar.Controls.AddRange([cmbLevel, btnLoad, importReflux, resolvePending, search, style, difficulty, find, ranks]);
         importReflux.Click += async (_, _) => await ImportRefluxAsync();
+        resolvePending.Click += async (_, _) => await ResolvePendingAsync();
         FormClosing += (_, e) => { if (importing) e.Cancel = true; };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(10) };
         layout.RowStyles.Add(new(SizeType.AutoSize)); layout.RowStyles.Add(new(SizeType.Percent, 100)); layout.RowStyles.Add(new(SizeType.AutoSize));
@@ -70,13 +74,22 @@ public partial class Form1 : Form
         grid.BackgroundColor = SystemColors.Window;
         grid.DefaultCellStyle.NullValue = "—";
     }
-    private async void Form1_Load(object? sender, EventArgs e) => await LoadDataAsync();
+    private async void Form1_Load(object? sender, EventArgs e)
+    {
+        await LoadDataAsync();
+        if (IsDisposed || startupAuditDone || snapshot is null) return;
+        startupAuditDone = true;
+        if (snapshot.Pending > 0 && MessageBox.Show(this,
+            $"未解決の記録が{snapshot.Pending}件あります（再試行の記録を含みます）。\n確認画面で元データと候補を確認し、履歴の譜面を手動で確定できます。\n今すぐ確認しますか？",
+            "未解決行の確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) == DialogResult.OK)
+            await ResolvePendingAsync();
+    }
     private async void btnLoad_Click(object? sender, EventArgs e) => await LoadDataAsync();
 
     private async Task LoadDataAsync()
     {
         if (loading) return;
-        loading = true; btnLoad.Enabled = false; importReflux.Enabled = false; status.Text = "読み込み中…";
+        loading = true; btnLoad.Enabled = false; importReflux.Enabled = false; resolvePending.Enabled = false; status.Text = "読み込み中…";
         try
         {
             var result = await Task.Run(() =>
@@ -102,7 +115,15 @@ public partial class Form1 : Form
             snapshot = null; dgvStats.Rows.Clear(); chartsGrid.Rows.Clear(); status.Text = "読み込み失敗：" + ex.Message;
             MessageBox.Show(this, ex.Message + "\n本体横のINIと表示用DBを確認してください。", "ベータ版の読み込み", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { loading = false; if (!IsDisposed) { btnLoad.Enabled = !importing; importReflux.Enabled = !importing && snapshot != null; } }
+        finally { loading = false; if (!IsDisposed) { btnLoad.Enabled = !importing; importReflux.Enabled = !importing && snapshot != null; resolvePending.Enabled = !importing && snapshot?.Pending > 0; } }
+    }
+
+    private async Task ResolvePendingAsync()
+    {
+        if (loading || importing || settings is null) return;
+        var service = new ManualPlayResolution(new DatabaseInitializer(settings.DatabasePath), Path.Combine(settings.Directory, "backups"));
+        using var dialog = new UnresolvedImportDialog(service);
+        if (dialog.ShowDialog(this) == DialogResult.OK) await LoadDataAsync();
     }
 
     private async Task ImportRefluxAsync()
@@ -113,7 +134,7 @@ public partial class Form1 : Form
             var importer = new BetaRefluxImport(settings);
             using var dialog = new RefluxImportDialog(importer.ReadSessions());
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            importing = true; importReflux.Enabled = false; btnLoad.Enabled = false;
+            importing = true; importReflux.Enabled = false; btnLoad.Enabled = false; resolvePending.Enabled = false;
             status.Text = "Reflux取込中… 完了までお待ちください。";
             var path = dialog.SourcePath; var id = dialog.SessionId; var options = dialog.Options;
             var result = await Task.Run(() => importer.ImportAsync(path, id, options));
@@ -123,7 +144,7 @@ public partial class Form1 : Form
                 "Reflux取込結果", MessageBoxButtons.OK, result.Status == "SUCCESS" ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Reflux取込失敗", MessageBoxButtons.OK, MessageBoxIcon.Error); status.Text = "Reflux取込失敗：" + ex.Message; }
-        finally { importing = false; importReflux.Enabled = snapshot != null; btnLoad.Enabled = true; }
+        finally { importing = false; importReflux.Enabled = snapshot != null; btnLoad.Enabled = true; resolvePending.Enabled = snapshot?.Pending > 0; }
     }
 
     private TableView? CurrentTable => snapshot?.Tables.FirstOrDefault(t => t.Code == ((DifficultyTableDefinition)cmbLevel.SelectedItem!).Code);

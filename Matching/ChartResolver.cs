@@ -182,7 +182,7 @@ public sealed class ChartResolver
         return Result(issues.Count == 0 ? chart.ChartId : null);
     }
 
-    private static bool TryParseChart(string? value, string? suppliedStyle, out string style, out string difficulty)
+    internal static bool TryParseChart(string? value, string? suppliedStyle, out string style, out string difficulty)
     {
         style = suppliedStyle ?? "";
         difficulty = value ?? "";

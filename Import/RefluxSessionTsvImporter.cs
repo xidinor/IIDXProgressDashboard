@@ -191,7 +191,7 @@ public sealed class RefluxSessionTsvImporter(DatabaseInitializer database, strin
             timeZoneId = options.TimeZoneId, playedAtPrecision = "second", accepted, header, rowCount,
             prefixHash, duplicates, unresolved, invalid, conflicts, held });
 
-    private static void InsertPlay(SqliteConnection c, SqliteTransaction t, long run, string key,
+    internal static void InsertPlay(SqliteConnection c, SqliteTransaction t, long run, string key,
         string raw, RefluxConvertedRow value, long chart)
     {
         using var command = Command(c, t, """
