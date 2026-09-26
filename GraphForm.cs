@@ -66,6 +66,11 @@ public partial class GraphForm : Form
         control.Plot.XLabel("Play number"); control.Plot.YLabel(bp ? "BP" : "EX SCORE");
         control.Plot.Axes.AutoScale();
         control.Plot.Axes.SetLimitsX(0.5, Math.Max(1, chart.History.Count) + 0.5);
+        // 横軸は実プレイの通し番号。件数が多い場合も整数の目盛りだけを間引いて表示する。
+        var step = Math.Max(1, (int)Math.Ceiling(visible.Length / 10.0));
+        var ticks = visible.Where((_, index) => index == 0 || index == visible.Length - 1 || index % step == 0)
+            .Select(point => point.Number).ToArray();
+        control.Plot.Axes.Bottom.SetTicks(ticks.Select(number => (double)number).ToArray(), ticks.Select(number => number.ToString()).ToArray());
         control.Refresh();
     }
     private void Hover(FormsPlot control, MouseEventArgs e, bool bp)
