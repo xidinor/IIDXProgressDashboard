@@ -47,11 +47,11 @@ public partial class GraphForm : Form
             (chart.History.Count == 0 ? "未プレイ" : visible.Length == 0 ? "除外オプションにより表示対象なし" : "") +
             $"　現行Notes：{chart.Notes?.ToString() ?? "—"}　日時：{TimeZoneInfo.Local.DisplayName}";
         historyGrid.Columns.Clear();
-        foreach (var name in new[] { "回", "プレイ日時", "ランプ", "EX SCORE", "BP", "DJ LEVEL", "Score Rate" }) historyGrid.Columns.Add(name, name);
+        foreach (var name in new[] { "回", "プレイ日時", "ランプ", "Options", "EX SCORE", "BP", "DJ LEVEL", "Score Rate" }) historyGrid.Columns.Add(name, name);
         foreach (var p in visible)
         {
             var score = DisplayValues.Score(p.Score, chart.Notes);
-            historyGrid.Rows.Add(p.Number, p.LocalDate, DisplayValues.Lamp(p.Lamp), p.Score, p.MissCount, score.DjLevel, score.Rate);
+            historyGrid.Rows.Add(p.Number, p.LocalDate, DisplayValues.Lamp(p.Lamp), p.Options, p.Score, p.MissCount, score.DjLevel, score.Rate);
         }
         historyGrid.AccessibleDescription = "同時刻は保存ID順。元の実プレイの先後を保証しません。";
     }

@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace IIDXProgressDashboard.Dashboard;
 
 public sealed record HistoryPoint(long PlayId, long ChartId, int Number, string PlayedAt, int Lamp,
-    int Score, int? MissCount, bool MinutePrecision)
+    int Score, int? MissCount, bool MinutePrecision, string Options)
 {
     public string LocalDate => DateTimeOffset.Parse(PlayedAt, CultureInfo.InvariantCulture)
         .ToLocalTime().ToString(MinutePrecision ? "yyyy/MM/dd HH:mm" : "yyyy/MM/dd HH:mm:ss");
@@ -54,5 +54,21 @@ public static class DisplayValues
         if (raw is null) return false;
         using var json = JsonDocument.Parse(raw);
         return json.RootElement.TryGetProperty("playedAtPrecision", out var value) && value.GetString() == "minute";
+    }
+
+    // 旧履歴のオプションは専用列に移されていないため、保全した元行から表示時だけ読む。
+    internal static string Options(string? style1, string? style2, string? raw)
+    {
+        if (raw is not null)
+        {
+            using var json = JsonDocument.Parse(raw);
+            if (json.RootElement.TryGetProperty("row", out var row) &&
+                row.TryGetProperty("played_option", out var option) && option.ValueKind == JsonValueKind.String)
+                return string.IsNullOrWhiteSpace(option.GetString()) ? "—" : option.GetString()!;
+        }
+        var parts = new[] { style1, style2 }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        var text = string.Join(" / ", parts);
+        return text.Length == 0 ? "—" : text;
     }
 }

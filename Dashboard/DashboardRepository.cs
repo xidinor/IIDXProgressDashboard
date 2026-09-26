@@ -17,14 +17,16 @@ public sealed class DashboardRepository(string path)
             var cmd = connection.CreateCommand(); cmd.Transaction = transaction; cmd.CommandText = sql; return cmd;
         }
         var histories = new Dictionary<long, List<HistoryPoint>>();
-        using (var cmd = Query("SELECT play_id,chart_id,played_at,clear_lamp,score,miss_count,raw_data FROM play_history ORDER BY played_at,play_id;"))
+        using (var cmd = Query("SELECT play_id,chart_id,played_at,clear_lamp,score,miss_count,raw_data,option_style_1,option_style_2 FROM play_history ORDER BY played_at,play_id;"))
         using (var r = cmd.ExecuteReader())
             while (r.Read())
             {
                 long id = r.GetInt64(1);
                 if (!histories.TryGetValue(id, out var list)) histories[id] = list = [];
                 list.Add(new(r.GetInt64(0), id, list.Count + 1, r.GetString(2), r.GetInt32(3), r.GetInt32(4),
-                    r.IsDBNull(5) ? null : r.GetInt32(5), DisplayValues.IsMinute(r.IsDBNull(6) ? null : r.GetString(6))));
+                    r.IsDBNull(5) ? null : r.GetInt32(5), DisplayValues.IsMinute(r.IsDBNull(6) ? null : r.GetString(6)),
+                    DisplayValues.Options(r.IsDBNull(7) ? null : r.GetString(7), r.IsDBNull(8) ? null : r.GetString(8),
+                        r.IsDBNull(6) ? null : r.GetString(6))));
             }
         var charts = new List<ChartView>();
         using (var cmd = Query("SELECT c.chart_id,s.title,c.play_style,c.difficulty,c.level,c.total_notes,c.is_active AND s.is_active FROM charts c JOIN songs s ON s.tag=c.tag ORDER BY s.title,c.play_style,c.difficulty;"))

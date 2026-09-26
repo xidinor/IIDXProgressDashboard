@@ -30,7 +30,7 @@ public sealed class BetaDisplayTests
                 CREATE TABLE play_history (id INTEGER PRIMARY KEY,played_at TEXT,song_name TEXT,difficulty_type TEXT,
                 level TEXT,total_notes INTEGER,score INTEGER,miss_count INTEGER,clear_type TEXT,played_option TEXT,original_data TEXT);
                 INSERT INTO play_history VALUES
-                (1,'2026-01-01-12-00','Song','SPA','11',1000,1800,0,'H-CLEAR',NULL,'original 1'),
+                (1,'2026-01-01-12-00','Song','SPA','11',1000,1800,0,'H-CLEAR','RANDOM','original 1'),
                 (2,'2026-01-01-12-00','Song','SPA','11',1000,1200,NULL,'FAILED',NULL,'original 2'),
                 (3,'2026-01-01-12-01','Song','DPA','11',1000,1000,20,'NO PLAY',NULL,'original 3'),
                 (4,'2026-01-01-12-02','Missing','SPA','11',1000,800,10,'FAILED',NULL,'unresolved');
@@ -49,6 +49,8 @@ public sealed class BetaDisplayTests
             Assert.Equal(new[] { 1, 2 }, sp.History.Select(p => p.Number));
             Assert.All(sp.History, p => Assert.True(p.MinutePrecision));
             Assert.Equal("2026-01-01T03:00:00Z", sp.History[0].PlayedAt);
+            Assert.Equal("RANDOM", sp.History[0].Options);
+            Assert.Equal("—", sp.History[1].Options);
             Assert.Equal(0, snapshot.Charts.Single(c => c.ChartId == 2).BestLamp);
             Assert.Null(snapshot.Charts.Single(c => c.ChartId == 3).BestLamp);
             Assert.Equal(1, snapshot.Pending); Assert.Equal(2, Assert.Single(snapshot.Tables).Entries.Count);
@@ -61,8 +63,8 @@ public sealed class BetaDisplayTests
 
             // Beta2は既存Importer内部を再検証せず、旧履歴→Reflux→一覧/グラフ共通モデルを確認。
             var tsv = Path.Combine(directory, "Session.tsv");
-            const string header = "title\tdifficulty\tlamp\texscore\tmisscount\tdate\n";
-            const string row = "Song\tSPA\tEC\t1500\t-\t2026/09/23 12:34:56\n";
+            const string header = "title\tdifficulty\tlamp\texscore\tmisscount\tstyle\tgauge\tdate\n";
+            const string row = "Song\tSPA\tEC\t1500\t-\tRANDOM\tEASY\t2026/09/23 12:34:56\n";
             File.WriteAllText(tsv, header + row);
             var reflux = new BetaRefluxImport(settings);
             var imported = await reflux.ImportAsync(tsv, null, new());
@@ -72,7 +74,7 @@ public sealed class BetaDisplayTests
             Assert.Equal(1, duplicate.Duplicates); Assert.Equal(0, duplicate.Imported);
             var renamed = Path.Combine(directory, "Renamed.tsv");
             File.Copy(tsv, renamed);
-            File.AppendAllText(renamed, "Song\tSPA\tHC\t1900\t4\t2026/09/23 12:35:56\n");
+            File.AppendAllText(renamed, "Song\tSPA\tHC\t1900\t4\tMIRROR\tHARD\t2026/09/23 12:35:56\n");
             var appended = await reflux.ImportAsync(renamed, saved.Id, saved.Options);
             Assert.Equal(1, appended.Imported); Assert.Equal(1, appended.Duplicates);
             Assert.Equal(2, (await reflux.ImportAsync(renamed, null, saved.Options)).Duplicates);
@@ -80,6 +82,8 @@ public sealed class BetaDisplayTests
             Assert.Equal(4, sp.History.Count); Assert.Equal(1900, sp.Latest!.Score); Assert.Equal(1900, sp.BestScore);
             Assert.Equal(0, sp.MinimumBp); Assert.Null(sp.History[2].MissCount);
             Assert.False(sp.History[2].MinutePrecision); Assert.Equal("2026-09-23T12:34:56Z", sp.History[2].PlayedAt);
+            Assert.Equal("RANDOM", sp.History[2].Options);
+            Assert.Equal("MIRROR", sp.History[3].Options);
             Assert.Equal(before, File.ReadAllBytes(legacy));
         }
         finally { Directory.Delete(directory, true); }
