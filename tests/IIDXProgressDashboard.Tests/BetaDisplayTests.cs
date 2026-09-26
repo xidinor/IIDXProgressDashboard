@@ -90,6 +90,31 @@ public sealed class BetaDisplayTests
     }
 
     [Fact]
+    public void RepeatedHistoryFilterKeepsFirstOfSameConditionWithinTwoMinutes()
+    {
+        // 同条件の記録が間に別条件を挟んでも、時刻順の最初だけを表示する。
+        HistoryPoint Point(int number, string time, int score = 1934, int? bp = 130, string options = "OFF") =>
+            new(number, 1, number, time, 3, score, bp, true, options);
+        var history = new[]
+        {
+            Point(1, "2026-07-02T12:48:00Z"),
+            Point(2, "2026-07-02T12:49:00Z"),
+            Point(3, "2026-07-02T12:50:00Z", score: 1500),
+            Point(4, "2026-07-02T12:51:00Z"),
+            Point(5, "2026-07-02T12:53:00Z", options: "RANDOM"),
+            Point(6, "2026-07-02T12:54:00Z", bp: null),
+            Point(7, "2026-07-02T12:56:01Z"),
+            Point(8, "2026-07-03T12:56:00Z"),
+        };
+        Assert.Equal(8, DisplayValues.Visible(history, false).Length);
+        Assert.Equal(new[] { 1, 3, 5, 6, 7, 8 },
+            DisplayValues.Visible(history, false, true).Select(p => p.Number));
+        Assert.Equal(new[] { 1, 3, 5, 7, 8 },
+            DisplayValues.Visible(history, true, true).Select(p => p.Number));
+        Assert.Equal(8, history.Length);
+    }
+
+    [Fact]
     public void ScoreBoundariesUseIntegerComparisonAndDisplayRoundingOnly()
     {
         // 小さなループで全境界の直前・到達と、分母の剰余を確認する。

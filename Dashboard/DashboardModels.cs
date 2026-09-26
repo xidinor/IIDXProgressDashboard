@@ -46,8 +46,27 @@ public static class DisplayValues
         return (level, percent.ToString("F2", CultureInfo.InvariantCulture) + "%");
     }
 
-    public static HistoryPoint[] Visible(IReadOnlyList<HistoryPoint> history, bool excludeMissingBp) =>
-        history.Where(p => !excludeMissingBp || p.MissCount.HasValue).ToArray();
+    public static HistoryPoint[] Visible(IReadOnlyList<HistoryPoint> history, bool excludeMissingBp, bool hideRepeated = false)
+    {
+        IEnumerable<HistoryPoint> points = hideRepeated ? WithoutRepeated(history) : history;
+        return points.Where(p => !excludeMissingBp || p.MissCount.HasValue).ToArray();
+    }
+
+    private static IEnumerable<HistoryPoint> WithoutRepeated(IReadOnlyList<HistoryPoint> history)
+    {
+        // 取得済み履歴だけを比較する。同じ日の同条件の連続記録は最初の1件を残し、DBは変更しない。
+        var previous = new Dictionary<(long ChartId, DateOnly Day, int Lamp, int Score, int? Bp, string Options), DateTimeOffset>();
+        var kept = new List<HistoryPoint>();
+        foreach (var point in history.OrderBy(p => p.PlayedAt, StringComparer.Ordinal).ThenBy(p => p.PlayId))
+        {
+            var time = DateTimeOffset.Parse(point.PlayedAt, CultureInfo.InvariantCulture);
+            var key = (point.ChartId, DateOnly.FromDateTime(time.ToLocalTime().DateTime), point.Lamp, point.Score, point.MissCount, point.Options);
+            var repeated = previous.TryGetValue(key, out var last) && time - last <= TimeSpan.FromMinutes(2);
+            previous[key] = time;
+            if (!repeated) kept.Add(point);
+        }
+        return kept.OrderBy(p => p.Number);
+    }
 
     internal static bool IsMinute(string? raw)
     {

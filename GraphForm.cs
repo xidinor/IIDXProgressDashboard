@@ -9,6 +9,7 @@ public partial class GraphForm : Form
     private ChartView chart;
     private readonly FormsPlot bpPlot = new() { Dock = DockStyle.Fill };
     private readonly CheckBox exclude = new() { Text = "ミスカウント取得不可を除外", AutoSize = true };
+    private readonly CheckBox hideRepeated = new() { Text = "多重記録された履歴を表示しない", AutoSize = true };
     private readonly System.Windows.Forms.Label summary = new() { AutoSize = true };
     private readonly DataGridView historyGrid = Form1.NewGrid();
     private readonly ToolTip tooltip = new();
@@ -27,10 +28,11 @@ public partial class GraphForm : Form
         layout.RowStyles.Add(new(SizeType.AutoSize)); layout.RowStyles.Add(new(SizeType.Percent, 35));
         layout.RowStyles.Add(new(SizeType.Percent, 35)); layout.RowStyles.Add(new(SizeType.Percent, 30));
         var header = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
-        header.Controls.AddRange([exclude, summary]);
+        header.Controls.AddRange([exclude, hideRepeated, summary]);
         layout.Controls.Add(header, 0, 0); layout.Controls.Add(formsPlot1, 0, 1); layout.Controls.Add(bpPlot, 0, 2); layout.Controls.Add(historyGrid, 0, 3);
         Controls.Add(layout);
         exclude.Checked = excludeMissingBp; exclude.CheckedChanged += (_, _) => RenderChart();
+        hideRepeated.CheckedChanged += (_, _) => RenderChart();
         formsPlot1.MouseMove += (_, e) => Hover(formsPlot1, e, false);
         bpPlot.MouseMove += (_, e) => Hover(bpPlot, e, true);
         formsPlot1.MouseLeave += (_, _) => ClearTooltip(); bpPlot.MouseLeave += (_, _) => ClearTooltip();
@@ -41,7 +43,7 @@ public partial class GraphForm : Form
     private void RenderChart()
     {
         Text = chart.Label + " — 履歴・グラフ";
-        visible = DisplayValues.Visible(chart.History, exclude.Checked); ClearTooltip();
+        visible = DisplayValues.Visible(chart.History, exclude.Checked, hideRepeated.Checked); ClearTooltip();
         Draw(formsPlot1, visible, false); Draw(bpPlot, visible.Where(p => p.MissCount.HasValue).ToArray(), true);
         summary.Text = $"全{chart.History.Count}プレイ / 表示{visible.Length}件　" +
             (chart.History.Count == 0 ? "未プレイ" : visible.Length == 0 ? "除外オプションにより表示対象なし" : "") +
