@@ -13,10 +13,12 @@ public sealed class UnresolvedImportDialog : Form
     private readonly TextBox search = new() { Width = 260, PlaceholderText = "候補の曲名・tagで検索" };
     private readonly TextBox note = new() { Width = 360, PlaceholderText = "この譜面と判断した理由（必須）" };
     private readonly Button choose = new() { Text = "選択を確定予定に追加", AutoSize = true, Enabled = false };
+    private readonly Button chooseBulk = new() { Text = "同じ取込元・曲名・譜面を一括選択", AutoSize = true, Enabled = false };
     private readonly Button save = new() { Text = "確定予定を保存", AutoSize = true, Enabled = false };
     private readonly Button cancel = new() { Text = "キャンセル", AutoSize = true, DialogResult = DialogResult.Cancel };
     private readonly Label information = new() { AutoSize = true, MaximumSize = new Size(1000, 0) };
     private readonly Dictionary<long, ManualPlayDecision> decisions = [];
+    private readonly HashSet<long> bulkIds = [];
     private ManualPlayReview? review;
     private int generation;
     private bool saving;
@@ -43,7 +45,7 @@ public sealed class UnresolvedImportDialog : Form
         layout.Controls.Add(candidates, 0, 4);
         var action = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
         var remove = new Button { Text = "この行の確定予定を取消", AutoSize = true };
-        action.Controls.AddRange([note, choose, remove]); layout.Controls.Add(action, 0, 5);
+        action.Controls.AddRange([note, choose, chooseBulk, remove]); layout.Controls.Add(action, 0, 5);
         var footer = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
         footer.Controls.AddRange([save, cancel, information]); layout.Controls.Add(footer, 0, 6); Controls.Add(layout);
         CancelButton = cancel;
@@ -55,10 +57,11 @@ public sealed class UnresolvedImportDialog : Form
         search.TextChanged += (_, _) => RenderCandidates();
         showAll.Click += (_, _) => search.Clear();
         choose.Click += (_, _) => StageSelection();
+        chooseBulk.Click += async (_, _) => await StageBulkAsync();
         remove.Click += (_, _) =>
         {
             if (review is null) return;
-            decisions.Remove(review.Row.Id); UpdateStagedRows();
+            decisions.Remove(review.Row.Id); bulkIds.Remove(review.Row.Id); UpdateStagedRows();
         };
         save.Click += async (_, _) => await SaveAsync();
         FormClosing += (_, e) => { if (saving) e.Cancel = true; else generation++; };
@@ -84,7 +87,7 @@ public sealed class UnresolvedImportDialog : Form
     private async Task ReviewSelectionAsync()
     {
         var current = ++generation;
-        review = null; choose.Enabled = false; candidates.Rows.Clear(); note.Clear();
+        review = null; choose.Enabled = false; chooseBulk.Enabled = false; candidates.Rows.Clear(); note.Clear();
         if (pending.CurrentRow?.Tag is not PendingImport row) return;
         detail.Text = "元行を確認中…";
         try
@@ -126,13 +129,36 @@ public sealed class UnresolvedImportDialog : Form
         choose.Enabled = !saving && review?.BlockedReason is null && review?.Request is { } request
             && candidates.CurrentRow?.Tag is ChartCandidate chart && !string.IsNullOrWhiteSpace(note.Text)
             && ManualPlayResolution.Incompatibility(request, chart) is null;
+        chooseBulk.Enabled = choose.Enabled;
     }
 
     private void StageSelection()
     {
         if (!choose.Enabled || review is null || candidates.CurrentRow?.Tag is not ChartCandidate chart) return;
         decisions[review.Row.Id] = new(review.Row, chart, note.Text.Trim());
+        bulkIds.Remove(review.Row.Id);
         UpdateStagedRows();
+    }
+
+    private async Task StageBulkAsync()
+    {
+        if (!chooseBulk.Enabled || review is null || candidates.CurrentRow?.Tag is not ChartCandidate chart) return;
+        var anchor = review.Row; var reason = note.Text.Trim();
+        chooseBulk.Enabled = false;
+        try
+        {
+            var group = await Task.Run(() => service.PrepareBulk(anchor, chart, reason));
+            if (IsDisposed) return;
+            foreach (var decision in group)
+            {
+                decisions[decision.Row.Id] = decision;
+                bulkIds.Add(decision.Row.Id);
+            }
+            UpdateStagedRows();
+            information.Text = $"同じ取込元・種別・曲名・譜面の{group.Count}元行を一括確定予定に追加しました。保存時に対象件数を確認します。";
+        }
+        catch (Exception ex) { if (!IsDisposed) MessageBox.Show(this, ex.Message, "一括選択できません", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        finally { if (!IsDisposed) UpdateSelection(); }
     }
 
     private void UpdateStagedRows()
@@ -148,10 +174,14 @@ public sealed class UnresolvedImportDialog : Form
     {
         if (saving || decisions.Count == 0) return;
         var batch = decisions.Values.ToArray();
+        var bulkSelectionIds = bulkIds.ToArray();
+        if (bulkIds.Count > 0 && MessageBox.Show(this,
+            $"同じ取込元・種別・曲名・譜面で一括選択した{bulkIds.Count}元行を含む、合計{batch.Length}元行を保存します。\n各元行は別プレイとして登録されます。続行しますか？",
+            "一括確定の確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
         saving = true; Enabled = false;
         try
         {
-            await Task.Run(() => service.Save(batch));
+            await Task.Run(() => service.Save(batch, bulkSelectionIds));
             saving = false; DialogResult = DialogResult.OK; Close();
         }
         catch (Exception ex)

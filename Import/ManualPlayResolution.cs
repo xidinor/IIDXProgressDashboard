@@ -68,11 +68,40 @@ public sealed class ManualPlayResolution(DatabaseInitializer database, string ba
         return null;
     }
 
-    public void Save(IReadOnlyList<ManualPlayDecision> decisions)
+    /// <summary>同じ取込元ID・種別・元曲名・譜面表記の未解決プレイを、元行単位で検証して仮決定する。</summary>
+    public IReadOnlyList<ManualPlayDecision> PrepareBulk(PendingImport anchor, ChartCandidate chart, string note)
+    {
+        if (string.IsNullOrWhiteSpace(note)) throw new InvalidDataException("判断理由を入力してください。");
+        var sourceId = SourceIdentity(anchor);
+        if (sourceId is null || anchor.Entity != "PLAY_HISTORY" || string.IsNullOrWhiteSpace(anchor.Title))
+            throw new InvalidDataException("この元行は一括確定の対象にできません。");
+        var rows = ReadPending().Where(row => row.Source == anchor.Source && SourceIdentity(row) == sourceId
+            && row.Entity == anchor.Entity && row.Title == anchor.Title && row.Difficulty == anchor.Difficulty).ToArray();
+        if (!rows.Any(row => row.Id == anchor.Id)) throw new InvalidDataException("選択中の未解決行が変更されています。画面を開き直してください。");
+        if (rows.Length < 2) throw new InvalidDataException("同じ条件の未解決元行が2件以上ありません。");
+        var decisions = rows.Select(row => new ManualPlayDecision(row, chart, note.Trim())).ToArray();
+        using var c = OpenReadOnly();
+        using var t = c.BeginTransaction(deferred: true);
+        // 1件でも不正・変更済み・譜面条件の矛盾があれば、グループ全体を仮決定しない。
+        foreach (var decision in decisions) Validate(c, t, decision);
+        return decisions;
+    }
+
+    private static string? SourceIdentity(PendingImport row)
+    {
+        if (row.Key is null) return null;
+        var colon = row.Key.IndexOf(':');
+        if (colon <= 0 || !Guid.TryParseExact(row.Key[..colon], "N", out _)) return null;
+        return row.Key[..colon];
+    }
+
+    public void Save(IReadOnlyList<ManualPlayDecision> decisions, IReadOnlyCollection<long>? bulkSelectionIds = null)
     {
         if (decisions.Count == 0) return;
         if (decisions.Select(d => (d.Row.Source, d.Row.Key)).Distinct().Count() != decisions.Count)
             throw new InvalidDataException("同じ元行の決定が重複しています。");
+        if (bulkSelectionIds is not null && bulkSelectionIds.Except(decisions.Select(d => d.Row.Id)).Any())
+            throw new InvalidDataException("一括確定対象が保存対象と一致しません。");
         using var c = database.OpenConnection();
         new MigrationRunner().Run(c);
         long run;
@@ -86,7 +115,9 @@ public sealed class ManualPlayResolution(DatabaseInitializer database, string ba
                 VALUES ($type,'manual',$options,'RUNNING',$count) RETURNING import_run_id;
                 """, ("$type", SourceType), ("$count", decisions.Count), ("$options", JsonSerializer.Serialize(new
                 {
-                    contractVersion = 1, method = "explicit-chart-selection", decisions = decisions.Select(d => new
+                    contractVersion = 1, method = "explicit-chart-selection",
+                    bulkSelectionUnresolvedIds = bulkSelectionIds?.Order().ToArray() ?? [],
+                    decisions = decisions.Select(d => new
                     { unresolvedId = d.Row.Id, originalImportRunId = d.Row.RunId, d.Row.Source, d.Row.Key,
                         d.Row.Reason, selectedChart = d.Chart, note = d.Note.Trim() })
                 })));
