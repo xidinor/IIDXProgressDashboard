@@ -30,12 +30,12 @@ dotnet test tests/IIDXProgressDashboard.Tests/IIDXProgressDashboard.Tests.csproj
 
 |Phase|解説|
 |---|---|
-|1 新DB基盤|[初期化・Migration](Database/README.md)|
-|2 マスター・照合|[マスター・譜面照合](docs/phase2-master-matching-explained.md)|
-|3 旧履歴|[Legacy Importer](docs/phase3-legacy-importer-explained.md)|
-|4 Reflux|[Session Importer](docs/phase4-reflux-session-importer-explained.md)|
-|5 非公式難易度表|[4表の管理](docs/phase5-difficulty-tables-explained.md)|
-|6 UI接続|[Beta1](docs/phase6-beta-display.md)・[Beta2](docs/phase6-beta2-reflux.md)・[Beta3](docs/phase6-manual-play-resolution.md)|
+|1 新DB基盤|[Phase 1](docs/phase1.md)|
+|2 マスター・照合|[Phase 2](docs/phase2.md)|
+|3 旧履歴|[Phase 3](docs/phase3.md)|
+|4 Reflux|[Phase 4](docs/phase4.md)|
+|5 非公式難易度表|[Phase 5](docs/phase5.md)|
+|6 UI接続|[Phase 6](docs/phase6.md)|
 |7 配布・旧依存除去|後続|
 
-作業ルールは [AGENTS.md](AGENTS.md)、ライセンスは [MIT License](LICENSE.txt) を参照してください。
+現行の設計契約は [SPECS.md](SPECS.md)、Phase文書と実装・検証の原記録は[文書案内](docs/README.md)、作業ルールは [AGENTS.md](AGENTS.md) を参照してください。ライセンスは [MIT License](LICENSE.txt) です。
