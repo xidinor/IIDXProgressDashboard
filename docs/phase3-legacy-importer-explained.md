@@ -39,7 +39,7 @@ flowchart TD
 
 ユーザーの2026-09-19の指示により、最終的な自動移行では旧形式の **iidx-progress.dbを最優先**にする。infinitas_log.dbは旧版Python出力として引き続き対応する。SelectPreferredSource(directory)は優先順で存在する1ファイルを返し、両方を連結しない。優先候補が不正・新形式なら取込時に拒否し、黙って別DBへ切り替えない。
 
-これは[仕様第20章](../SPECS.md#20-legacyinfinitaslogimporter)の11列入力からsong_tag付き12列入力への明示的な拡張である。両DBの混在・重複調停は対象外。既存統合DBが旧ログの完全な上位集合とは仮定しない。
+これは[当時の仕様第20章](archive/specs-v1-before-consolidation.md#20-legacyinfinitaslogimporter)の11列入力からsong_tag付き12列入力への明示的な拡張である。両DBの混在・重複調停は対象外。既存統合DBが旧ログの完全な上位集合とは仮定しない。
 
 | 列 | 宣言型・扱い |
 | --- | --- |
